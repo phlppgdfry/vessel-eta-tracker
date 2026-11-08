@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>VesselETA · CSP Zeebrugge</title>
+  <title>VesselETA · CSP Zeebrugge</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23163957'/%3E%3Cpath d='M12 15h16l-3 13H15zm8-8v8m-6 8h12' fill='none' stroke='%239bd9ff' stroke-width='2'/%3E%3C/svg%3E">
   <link rel="manifest" href="manifest.json"/>
   <meta name="theme-color" content="#0b1018"/>
   <meta name="description" content="Real-time vessel ETA tracking and berth planning for CSP Zeebrugge terminal operations"/>
@@ -11,11 +11,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --bg:#090e17; --surface:#0d1420; --surface2:#111929; --surface3:#172133;
-      --border:#1a2d44; --text:#d8e8f6; --text2:#9ab5cc; --muted:#4f6d88;
+      --border:#1a2d44; --text:#d8e8f6; --text2:#9ab5cc; --muted:#829bb2;
       --accent:#1d6fa8; --accent-hi:#2d8fd0; --accent-glow:rgba(45,143,208,.18);
       --green:#27a448; --yellow:#c48a0a; --orange:#c95c1a; --red:#b83232; --purple:#7c52c8;
       --font:'Inter','Segoe UI',system-ui,sans-serif;
@@ -195,6 +195,7 @@
 
     /* Chart */
     .chart-sec{padding:.48rem .72rem .6rem;border-top:1px solid var(--border);flex-shrink:0;}
+    .eta-chart-frame{height:120px;position:relative;min-width:0;}
     .chart-sec h3{font-size:.59rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:.35rem;}
 
     /* ── Berth Timeline ── */
@@ -296,6 +297,11 @@
 
     /* Flag emoji in vessel list */
     .vrow-flag{font-size:.7rem;flex-shrink:0;line-height:1;}
+
+    :focus-visible{outline:2px solid #73c8f7;outline-offset:3px;}
+    @media(max-width:1000px){.main-layout{grid-template-columns:minmax(0,1fr) 360px;}.h-vessel-ct,.h-div{display:none;} .brand-text p{display:none;} #kpi-bar{overflow-x:auto;flex-shrink:0;}}
+    @media(max-width:720px){body{height:auto;min-height:100vh;overflow:auto;}header{height:auto;min-height:60px;flex-wrap:wrap;padding:12px;gap:10px;} .h-right{gap:6px;}.brand-text h1{font-size:13px;}.conn-area{order:3;width:100%;}.main-layout{display:flex;flex-direction:column;overflow:visible;}.map-wrap{height:340px;flex-shrink:0;}#sidebar{height:620px;border-left:0;border-top:1px solid var(--border);}#timeline{height:200px;flex-shrink:0;}#kpi-bar{min-height:90px;}.kpi{min-width:130px;}.filter-bar{flex-wrap:wrap;}#settings-panel{max-width:100vw;}#toasts{max-width:calc(100vw - 24px);max-height:130px;overflow:auto;}.map-overlay{left:10px;transform:none;top:44px;}.demo-pill{font-size:10px;}.conflict-pill{font-size:10px;}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;}}
   </style>
 </head>
 <body>
@@ -402,7 +408,7 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <div class="filter-bar">
-      <input class="search" id="srch" placeholder="Search vessel, destination, berth…" oninput="renderList()"/>
+      <input aria-label="Search vessels" class="search" id="srch" placeholder="Search vessel, destination, berth…" oninput="renderList()"/>
       <button class="pill on" id="fp-all"  onclick="setFilter('all',this)">All</button>
       <button class="pill"    id="fp-4h"   onclick="setFilter('4h',this)">4h</button>
       <button class="pill"    id="fp-12h"  onclick="setFilter('12h',this)">12h</button>
@@ -442,7 +448,7 @@
 
     <div class="chart-sec">
       <h3>ETA Deviation History (min)</h3>
-      <canvas id="etaChart" height="80"></canvas>
+      <div class="eta-chart-frame"><canvas id="etaChart"></canvas></div>
     </div>
   </div>
 
@@ -558,11 +564,13 @@
 
 <script>
 // ─── Config ───────────────────────────────────────────────────────────────────
-const DEFAULT_API_KEY = '897a66335782442231c37a9761fcce9accd8f6f3';
+// Live credentials are supplied explicitly by the visitor, never bundled.
+const DEFAULT_API_KEY = '';
+let suppressToasts = false;
 const LS_KEY = 'vesseleta_apikey';
 
 function getApiKey() {
-  return localStorage.getItem(LS_KEY) || DEFAULT_API_KEY;
+  return sessionStorage.getItem(LS_KEY) || DEFAULT_API_KEY;
 }
 
 // Use local proxy when running via server.js, otherwise try direct (may fail in browser)
@@ -702,8 +710,8 @@ let totalMsgsReceived=0;
 // ─── Map ──────────────────────────────────────────────────────────────────────
 function initMap() {
   map = L.map('map',{zoomControl:false}).setView([51.42, 2.55], 8);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-    attribution:'© OpenStreetMap contributors © CARTO', maxZoom:19
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>', maxZoom:19
   }).addTo(map);
   L.control.zoom({position:'bottomright'}).addTo(map);
   map.on('zoom', () => {
@@ -852,6 +860,11 @@ function autoConnect(key) {
   if (ws && ws.readyState===WebSocket.OPEN) return;
   if (demoMode) return;
   if (isConnecting) return;
+  if (!(key || getApiKey())) { setStatus('', 'Demo paused'); hideConnOverlay(); return; }
+  if (!['localhost', '127.0.0.1'].includes(location.hostname)) {
+    toast('warn', 'Local proxy required', 'Run npm start locally to connect live AIS. The public site is a simulated portfolio demo.');
+    return;
+  }
   isConnecting = true;
   clearTimeout(reconnectTimer);
   setStatus('conn', 'Connecting…');
@@ -877,7 +890,7 @@ function autoConnect(key) {
     setTimeout(() => {
       if (ws && ws.readyState===WebSocket.OPEN && Object.keys(vessels).length===0) {
         toast('warn','No vessel data yet',
-          'Connected to aisstream.io but no ships received. Check browser console (F12) for details. Key: …'+getApiKey().slice(-6));
+          'Connected to aisstream.io but no ships received. Check the monitoring zone and feed permissions.');
         console.log('[AIS debug] Connected, 0 vessels after 20s. totalMsgs=', totalMsgsReceived, 'BBOX=', BBOX);
       }
     }, 20000);
@@ -924,7 +937,7 @@ function doReconnect() {
 function applyApiKey() {
   const k = document.getElementById('sp-apikey').value.trim();
   if (!k) { toast('warn','No key','Please enter an API key.'); return; }
-  localStorage.setItem(LS_KEY, k);
+  sessionStorage.setItem(LS_KEY, k);
   if (ws) { try { ws.close(); } catch(_){} ws = null; }
   isConnecting = false;
   reconnectDelay = 3000;
@@ -938,6 +951,7 @@ function applyApiKey() {
 function toggleDemo() { demoMode ? stopDemo() : startDemo(); }
 
 function startDemo() {
+  suppressToasts = true;
   if (ws) { try { ws.close(); } catch(_){} ws = null; }
   clearTimeout(reconnectTimer);
   demoMode=true;
@@ -965,8 +979,8 @@ function startDemo() {
 
   detectConflicts(); renderList(); renderTimeline(); updateKPIs(); updCounters(); updTime();
   demoTimer = setInterval(tickDemo, 3000);
-  fetchWeather();
-  wxTimer = setInterval(fetchWeather, 120000);
+  // Weather has its own refresh timer started during page initialization.
+  suppressToasts = false;
   toast('info','Demo Mode',''+DEMO_SEED.length+' vessels simulated in North Sea approach to Zeebrugge.');
 }
 
@@ -1039,6 +1053,7 @@ function fireAlert(mmsi) {
 }
 
 // ─── Live AIS ─────────────────────────────────────────────────────────────────
+function cleanAisLabel(value) { return String(value ?? '').replace(/[<>&"'`]/g, ' ').trim(); }
 function onAIS(msg) {
   msgCount++;
   totalMsgsReceived++;
@@ -1048,7 +1063,7 @@ function onAIS(msg) {
   }
   // Handle aisstream.io error responses
   if (msg.error || msg.Error || msg.message || msg.status) {
-    const errTxt = msg.error || msg.Error || msg.message || JSON.stringify(msg);
+    const errTxt = cleanAisLabel(msg.error || msg.Error || msg.message || JSON.stringify(msg));
     console.warn('[AIS error]', errTxt);
     setStatus('err', 'AIS error: ' + errTxt.slice(0, 40));
     document.getElementById('reconnect-btn').style.display = '';
@@ -1056,9 +1071,9 @@ function onAIS(msg) {
     return;
   }
   const mmsi=String(msg.MetaData?.MMSI||'');
-  const name=(msg.MetaData?.ShipName||'').trim()||mmsi;
+  const name=cleanAisLabel(msg.MetaData?.ShipName)||mmsi;
   const lat=msg.MetaData?.latitude, lon=msg.MetaData?.longitude;
-  if (!mmsi||!lat||!lon) return;
+  if (!/^\d{9}$/.test(mmsi) || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat)>90 || Math.abs(lon)>180) return;
 
   const mt = msg.MessageType;
   if (mt==='PositionReport') {
@@ -1069,10 +1084,10 @@ function onAIS(msg) {
     applyVessel(mmsi,{name,lat,lon,sog:p?.Sog||0,cog:p?.Cog||0,lastSeen:new Date()});
   } else if (mt==='ExtendedClassBPositionReport') {
     const p=msg.Message?.ExtendedClassBPositionReport;
-    applyVessel(mmsi,{name:(p?.Name||'').trim()||name,lat,lon,sog:p?.Sog||0,cog:p?.Cog||0,lastSeen:new Date()});
+    applyVessel(mmsi,{name:cleanAisLabel(p?.Name)||name,lat,lon,sog:p?.Sog||0,cog:p?.Cog||0,lastSeen:new Date()});
   } else if (mt==='ShipStaticData') {
     const sd=msg.Message?.ShipStaticData;
-    applyVessel(mmsi,{name:(sd?.Name||'').trim()||name,dest:(sd?.Destination||'').trim(),
+    applyVessel(mmsi,{name:cleanAisLabel(sd?.Name)||name,dest:cleanAisLabel(sd?.Destination),
       shipType:sd?.Type,lat,lon,lastSeen:new Date()});
   } else if (lat && lon) {
     // Catch-all for other message types that have position data
@@ -1291,7 +1306,7 @@ function renderList() {
       <div class="ph-sub">${all?'Try a different filter':
         demoMode?'Loading demo…':
         connected?'Connected — vessels appear when they broadcast AIS in the monitoring zone':
-        'Connecting to aisstream.io…'}</div></div>`;
+        'Demo paused. Start Demo or configure a local AIS connection in Settings.'}</div></div>`;
     return;
   }
   el.innerHTML=rows.map(v=>{
@@ -1313,7 +1328,7 @@ function renderList() {
     const isAppr = v.distKm!=null && v.distKm<25;
     const flag = mmsiFlag(v.mmsi);
     const relETA = fmtRelETA(v.calcEta);
-    return `<div class="vrow${selectedMmsi===v.mmsi?' sel':''}${stale?' stale':''}" onclick="selectVessel('${v.mmsi}')">
+    return `<div class="vrow${selectedMmsi===v.mmsi?' sel':''}${stale?' stale':''}" role="button" tabindex="0" aria-label="Inspect ${v.name || v.mmsi}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectVessel('${v.mmsi}')}" onclick="selectVessel('${v.mmsi}')">
       <div class="vrow-top">
         ${flag?`<span class="vrow-flag">${flag}</span>`:''}
         <span class="vname">${v.name||v.mmsi}</span>
@@ -1447,6 +1462,7 @@ function renderAlerts() {
 
 // ─── Toasts ───────────────────────────────────────────────────────────────────
 function toast(type, title, msg, ms=6500) {
+  if (suppressToasts) return;
   const icons={crit:'🚨',warn:'⚠️',ok:'✓',info:'ℹ'};
   const el=document.createElement('div');
   el.className=`toast ${type}`;
@@ -1522,9 +1538,11 @@ function doExport() {
       sp.teu||'',sp.loa||'',sp.draft||'',sp.agent||'',v.lat?.toFixed(5),v.lon?.toFixed(5)];
   });
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([[hdr,...rows].map(r=>r.join(',')).join('\n')],{type:'text/csv'}));
+  const url=URL.createObjectURL(new Blob([[hdr,...rows].map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
+  a.href=url;
   a.download=`csp-vessel-eta-${new Date().toISOString().slice(0,16).replace('T','-')}.csv`;
   a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 // ─── Flag emoji from MMSI prefix ─────────────────────────────────────────────
@@ -1631,8 +1649,8 @@ window.addEventListener('load', () => {
   fetchWeather();
   setInterval(fetchWeather, 120000);
 
-  // Auto-connect to live AIS feed
-  autoConnect();
+  // The public portfolio always starts without credentials.
+  startDemo();
 
   // Live clock — update every second
   setInterval(() => { document.getElementById('k-upd').textContent = fmtTimeSec(new Date()); }, 1000);

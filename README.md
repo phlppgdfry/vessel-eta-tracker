@@ -1,5 +1,24 @@
 # VesselETA — CSP Zeebrugge
 
+[![Portfolio demo](https://github.com/phlppgdfry/vessel-eta-tracker/actions/workflows/portfolio-pages.yml/badge.svg)](https://github.com/phlppgdfry/vessel-eta-tracker/actions/workflows/portfolio-pages.yml)
+
+## Interactive portfolio
+
+**[Open the demo](https://phlppgdfry.github.io/vessel-eta-tracker/)** · [Two-minute walkthrough](docs/PORTFOLIO.md) · [Verification notes](docs/VERIFICATION.md)
+
+No credentials required. The public demo uses synthetic sample data; it is an
+independent portfolio project, not an operating terminal or ERP environment.
+
+![Actual desktop demo](docs/screenshots/desktop.png)
+
+<details><summary>Mobile preview</summary>
+
+<img src="docs/screenshots/mobile.png" width="300" alt="Mobile view of the working portfolio demo" />
+
+</details>
+
+---
+
 > Real-time vessel tracking dashboard for container terminal operations. Compares live AIS positions against the planned N4 arrival schedule and alerts planners when ships deviate from their ETA — before they arrive.
 
 **[▶ Live Demo](https://phlppgdfry.github.io/vessel-eta-tracker/)** — no API key needed, demo launches automatically.

@@ -19,8 +19,12 @@ const MIME     = { '.html':'text/html', '.json':'application/json',
 
 // ── HTTP static file server ──────────────────────────────────────────────────
 const httpServer = http.createServer((req, res) => {
-  const url  = req.url === '/' ? '/index.html' : req.url;
-  const file = path.join(__dirname, url.split('?')[0]);
+  // Serve only the public dashboard. Never expose source, .env or .git files.
+  const pathname = new URL(req.url, 'http://localhost').pathname;
+  const allowed = new Set(['/index.html', '/manifest.json', '/icon.svg', '/favicon.svg']);
+  const url = pathname === '/' ? '/index.html' : pathname;
+  if (!allowed.has(url)) { res.writeHead(404); res.end('Not found'); return; }
+  const file = path.join(__dirname, url);
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); res.end('Not found'); return; }
     const ext = path.extname(file);
@@ -45,8 +49,7 @@ wss.on('connection', (client) => {
 
         upstream.on('open', () => {
           upstream.send(JSON.stringify(sub));
-          console.log('[proxy] Subscribed to aisstream.io, key=…' +
-            (sub.APIKey || '').slice(-6));
+          console.log('[proxy] Subscribed to aisstream.io');
         });
 
         upstream.on('message', (data, isBinary) => {
@@ -77,7 +80,7 @@ wss.on('connection', (client) => {
   client.on('error', () => { if (upstream) upstream.close(); });
 });
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, process.env.HOST || '127.0.0.1', () => {
   console.log(`\n⚓  VesselETA running at  http://localhost:${PORT}`);
   console.log(`   WebSocket proxy       ws://localhost:${PORT}/ais\n`);
 });
