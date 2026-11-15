@@ -1,0 +1,38 @@
+{
+  "name": "vessel-eta-tracker",
+  "url": "https://phlppgdfry.github.io/vessel-eta-tracker/",
+  "tested_route": "https://phlppgdfry.github.io/vessel-eta-tracker/",
+  "checked_at": "2026-11-15T18:57:25.624Z",
+  "title": "VesselETA · CSP Zeebrugge",
+  "http_status": 200,
+  "desktop": {
+    "width": 1440,
+    "scroll_width": 1440
+  },
+  "mobile": {
+    "width": 390,
+    "scroll_width": 390
+  },
+  "runtime_errors": [],
+  "status": "passed",
+  "browser": "Chromium via Playwright",
+  "browser_plugin": "unavailable",
+  "viewports": {
+    "desktop": {
+      "width": 1440,
+      "height": 1040
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  "interaction_checks": [
+    "Eight simulated vessels start without credentials",
+    "Search and inspect EVER ACE",
+    "CSV contains eight ships, independently of the list filter",
+    "Pause and restart preserve active search; clearing search restores eight ships",
+    "ETA chart remains bounded to 120 pixels"
+  ],
+  "scope": "Public synthetic-data portfolio demo. No live terminal or Business Central operations were performed."
+}

@@ -149,3 +149,7 @@ CSP Zeebrugge handles vessels on the AEX, EC2, and FE4 service loops — connect
 ## License
 
 MIT — see [LICENSE](LICENSE)
+
+## Final portfolio release
+
+[Final source snapshot — 15 November 2026](https://github.com/phlppgdfry/vessel-eta-tracker/releases/tag/portfolio-2026-11-15) · [Verification evidence](docs/VERIFICATION.md)
