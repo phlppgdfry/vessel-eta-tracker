@@ -1,3 +1,11 @@
+# Verification — 24 November 2026
+
+Vessel rows now use larger text and fewer badges. Delays appear first by default; arrival-time sorting remains available. Search, keyboard detail opening and CSV export are covered on desktop and mobile. Leaflet and Chart.js are served from locked dependencies, so their CDNs are not required at runtime.
+
+Current checks: production build, functional browser flows on desktop/mobile, CSV/download contents and no uncaught browser errors. PDF source reconciliation and gate-validator checks run in their respective CI pipelines. Updated screenshots are actual renders of the production artifacts.
+
+## Earlier release evidence
+
 # Verification record
 
 Portfolio refresh · 8 November 2026

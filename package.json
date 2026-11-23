@@ -4,15 +4,22 @@
   "description": "Real-time vessel ETA tracking dashboard for CSP Zeebrugge terminal operations",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "npm run build && node server.js",
     "test": "node --test server.test.js",
-    "install-deps": "npm install"
+    "install-deps": "npm install",
+    "build": "node scripts/build-demo.cjs",
+    "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "chart.js": "4.4.8",
+    "leaflet": "1.9.4"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
 }

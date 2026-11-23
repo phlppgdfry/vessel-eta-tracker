@@ -31,3 +31,8 @@ connection. The key is held in session storage, not bundled or logged. The publi
 GitHub Pages host deliberately does not attempt direct live AIS connections.
 
 The HTTP server serves an allowlist of public dashboard files, not the repository.
+
+
+## Updated walkthrough — 24 November 2026
+
+Vessel rows now use larger text and fewer badges. Delays appear first by default; arrival-time sorting remains available. Search, keyboard detail opening and CSV export are covered on desktop and mobile. Leaflet and Chart.js are served from locked dependencies, so their CDNs are not required at runtime.

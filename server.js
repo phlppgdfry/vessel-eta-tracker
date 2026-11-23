@@ -21,7 +21,7 @@ const MIME     = { '.html':'text/html', '.json':'application/json',
 const httpServer = http.createServer((req, res) => {
   // Serve only the public dashboard. Never expose source, .env or .git files.
   const pathname = new URL(req.url, 'http://localhost').pathname;
-  const allowed = new Set(['/index.html', '/manifest.json', '/icon.svg', '/favicon.svg']);
+  const allowed = new Set(['/index.html', '/manifest.json', '/icon.svg', '/favicon.svg', '/vendor/chart.umd.js', '/vendor/chart.LICENSE.md', '/vendor/leaflet/leaflet.js', '/vendor/leaflet/leaflet.css', '/vendor/leaflet/images/marker-icon.png', '/vendor/leaflet/images/marker-icon-2x.png', '/vendor/leaflet/images/marker-shadow.png', '/vendor/leaflet/images/layers.png', '/vendor/leaflet/images/layers-2x.png', '/vendor/leaflet/LICENSE']);
   const url = pathname === '/' ? '/index.html' : pathname;
   if (!allowed.has(url)) { res.writeHead(404); res.end('Not found'); return; }
   const file = path.join(__dirname, url);

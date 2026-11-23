@@ -49,7 +49,7 @@ Early ETA visibility gives operations the time to adapt. This tool surfaces devi
 | **ETA deviation** | Calculated ETA vs N4 scheduled ETA, colour-coded by severity |
 | **Alert log** | Critical deviations (>120 min) trigger toast + alert log |
 | **Vessel detail** | Voyage, service line, scheduled vs calculated ETA, approach line on map |
-| **Search & filter** | Filter by vessel name, service line, voyage, or status |
+| **Search & filter** | Search vessels and destinations; sort by delay priority or arrival time |
 | **ETA chart** | Deviation history for the last 30 updates |
 | **CSV export** | One-click export of current vessel state |
 
@@ -64,7 +64,7 @@ Live AIS feed (aisstream.io WebSocket)
 Filter vessels in bounding box  ←  North Sea / English Channel approach
         │
         ▼
-Position + speed  →  calculate real ETA to CSP Zeebrugge berth
+Position + speed  →  estimate arrival from straight-line distance
         │
         ▼
 Compare against N4 planned schedule
@@ -79,17 +79,22 @@ Deviation > threshold?  →  Alert (toast + log)
 
 ### Option 1 — Demo (no setup)
 
-1. Open `index.html` in any browser
+1. Open the hosted demo, or run `npm ci && npm start` and visit `http://localhost:3000`
 2. Demo launches automatically with 8 simulated vessels
 
 Or use the [hosted version](https://phlppgdfry.github.io/vessel-eta-tracker/).
 
 ### Option 2 — Live AIS data
 
-1. Get a **free** API key at [aisstream.io](https://aisstream.io) (sign up with GitHub)
-2. Open `index.html`
-3. Paste your API key → click **Connect**
-4. Live vessels in the North Sea approach appear on the map
+1. Obtain your own AISStream key from [aisstream.io](https://aisstream.io).
+2. Run `npm ci` and `npm start` (Node 22+); open `http://localhost:3000`.
+3. Open Settings, enter the key, and connect through the local `/ais` WebSocket proxy.
+4. Positions appear when vessels broadcast inside the monitored area. The key stays in the current browser session; never commit it.
+
+The GitHub Pages version is an automatic simulation. It cannot host the Node proxy.
+No production N4 schedule is connected. The browser libraries are copied from
+locked npm dependencies during `npm run build`; map tiles still use OpenStreetMap
+and optional weather uses Open-Meteo. A failed weather request does not stop the demo.
 
 ---
 
@@ -108,13 +113,13 @@ Or use the [hosted version](https://phlppgdfry.github.io/vessel-eta-tracker/).
 
 | Layer | Technology |
 |---|---|
-| Frontend | Pure HTML / CSS / JavaScript — zero dependencies, no build step |
-| Map | [Leaflet.js](https://leafletjs.com) + CartoDB dark tiles |
+| Frontend | HTML / CSS / JavaScript; npm build vendors browser libraries |
+| Map | [Leaflet.js](https://leafletjs.com) + OpenStreetMap tiles |
 | Charts | [Chart.js](https://chartjs.org) |
 | AIS data | [aisstream.io](https://aisstream.io) — free WebSocket API |
 | Schedule | Simulated N4 data (production: replace with N4 REST API) |
 
-Single file. No server. No framework. Opens directly in browser.
+No frontend framework. A small Node/`ws` server provides the optional local AIS proxy; GitHub Pages serves the built simulation.
 
 ---
 
@@ -136,7 +141,7 @@ With a fetch from your N4 REST API:
 const N4 = await fetch('/api/n4/expected-arrivals').then(r => r.json());
 ```
 
-The rest of the logic (ETA calculation, deviation, alerting) works unchanged.
+A production connection also needs authenticated schedule access, schema validation, timezone handling, secure proxy deployment and operational acceptance testing. ETA here is a straight-line distance/speed estimate; it does not model nautical routes, tides, pilotage or berth availability.
 
 ---
 
@@ -150,6 +155,15 @@ CSP Zeebrugge handles vessels on the AEX, EC2, and FE4 service loops — connect
 
 MIT — see [LICENSE](LICENSE)
 
-## Final portfolio release
+## Earlier portfolio release
 
 [Final source snapshot — 15 November 2026](https://github.com/phlppgdfry/vessel-eta-tracker/releases/tag/portfolio-2026-11-15) · [Verification evidence](docs/VERIFICATION.md)
+
+
+## Portfolio refinement — 24 November 2026
+
+Vessel rows now use larger text and fewer badges. Delays appear first by default; arrival-time sorting remains available. Search, keyboard detail opening and CSV export are covered on desktop and mobile. Leaflet and Chart.js are served from locked dependencies, so their CDNs are not required at runtime.
+
+Browser checks run before every default-branch Pages deployment, in Chromium at 1440×1000 and 390×844. They exercise filters, empty states and actual downloads. Run `npm ci` followed by `npm run test:e2e`. CI retains the HTML report and failure traces. Mobile here means Chromium emulation, not a physical-device or Safari certification.
+
+[Current refined source release — 24 November 2026](https://github.com/phlppgdfry/vessel-eta-tracker/releases/tag/portfolio-2026-11-24). Browser checks also run on pull requests.
