@@ -58,6 +58,6 @@ The exact routes, viewports and interaction checks are recorded in
 [the machine-readable final review](verification/final-review.json).
 The finalized source is preserved by the `portfolio-2026-11-15` release tag.
 
-## External account action
+## External account action — resolved
 
-AISStream credential revocation is unverified. The account page requires GitHub sign-in; no existing browser session was available at closeout. The owner must sign in at https://aisstream.io/account and revoke any previously exposed key. Public simulation requires no key. Two pre-existing local drafts remain outside the published artifact and were preserved.
+Resolved on 24 November 2026: after the owner authenticated, the previously exposed AISStream credential was matched to the historical repository credential without displaying its value. It was disabled in the authenticated provider account; the UI confirmed Disabled and offered Re-enable. No new credential was generated. Public simulation requires no key. Optional live AIS needs a fresh private key and the local server proxy; public real-time AIS would require a separately deployed secure backend. Two pre-existing local drafts remain outside the published artifact and were preserved.
