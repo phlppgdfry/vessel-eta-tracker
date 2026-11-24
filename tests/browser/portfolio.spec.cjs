@@ -65,4 +65,16 @@ test('settings control real map layers, validate thresholds and escape printable
   await page.getByRole('button',{name:'Shift handover report',exact:true}).click();
   await expect(page.locator('#pr-meta')).toContainText(terminal);await expect(page.locator('#pr-meta img')).toHaveCount(0);
   await settings.click();await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(settings).toBeFocused();
+  await page.route('http://portfolio.test:4174/**',async route=>{
+    const url=new URL(route.request().url());
+    const response=await page.request.get('http://127.0.0.1:4174'+url.pathname+url.search);
+    await route.fulfill({response});
+  });
+  await page.goto('http://portfolio.test:4174/');await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await expect(page.getByLabel('API Key (aisstream.io)',{exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Connect with this key',exact:false})).toBeDisabled();
+  await expect(page.locator('#ais-connection-help')).toContainText('does not need a key');
+  await page.evaluate(()=>applyApiKey());
+  expect(await page.evaluate(()=>sessionStorage.getItem(LS_KEY))).toBeNull();
+  expect(await page.evaluate(()=>demoMode)).toBe(true);
 });

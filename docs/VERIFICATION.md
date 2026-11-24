@@ -1,6 +1,6 @@
 # Closeout audit — 24 November 2026
 
-Settings now toggle actual Leaflet overlays, respect notification switches, validate threshold ordering, and immediately update list, details, timeline and KPIs. The drawer uses a native dialog with Escape and focus restoration. Terminal text is escaped before printing. Superseded conflicting PR #1 was closed, with its branch preserved.
+Settings now toggle actual Leaflet overlays, respect notification switches, validate threshold ordering, and immediately update list, details, timeline and KPIs. The drawer uses a native dialog with Escape and focus restoration. Terminal text is escaped before printing. The hosted-site key field and connect control are disabled; an early hostname guard preserves simulation and avoids storing a key on the public site. The regression test exercises both local-proxy and hosted origins. Superseded conflicting PR #1 was closed, with its branch preserved.
 
 4 Chromium browser checks passed across 1440×1000 desktop and 390×844 mobile emulation. No uncaught page errors or horizontal page overflow were observed. The full five-project set contains 20 browser checks. Current npm audit: zero known vulnerabilities. Local Markdown links resolve. Browser plugin not available; validation used Playwright. Physical devices, Safari and production terminal/ERP integrations are outside this synthetic portfolio acceptance scope.
 

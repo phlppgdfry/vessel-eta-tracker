@@ -494,7 +494,8 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
           <span class="sp-sub">Your key is stored in this browser session only</span>
           <input class="sp-input" id="sp-apikey" type="password" placeholder="Enter API key…"/>
         </div>
-        <button class="btn-apply reconnect-btn" onclick="applyApiKey()">⟳ Connect with this key</button>
+        <p id="ais-connection-help" style="font-size:12px;color:var(--muted)"></p>
+        <button class="btn-apply reconnect-btn" id="connect-key" onclick="applyApiKey()">⟳ Connect with this key</button>
       </div>
     </div>
     <div>
@@ -944,6 +945,10 @@ function doReconnect() {
 }
 
 function applyApiKey() {
+  if (!['localhost', '127.0.0.1'].includes(location.hostname)) {
+    document.getElementById('settings-error').textContent = 'Live AIS requires npm start on localhost. The hosted simulation does not need a key.';
+    return;
+  }
   const k = document.getElementById('sp-apikey').value.trim();
   if (!k) { toast('warn','No key','Please enter an API key.'); return; }
   sessionStorage.setItem(LS_KEY, k);
@@ -1496,6 +1501,12 @@ function toggleMapLayer(key, button) {
   if (enabled) map.addLayer(layer); else map.removeLayer(layer);
 }
 function openSettings() {
+  const localProxy = ['localhost', '127.0.0.1'].includes(location.hostname);
+  document.getElementById('sp-apikey').disabled = !localProxy;
+  document.getElementById('connect-key').disabled = !localProxy;
+  document.getElementById('ais-connection-help').textContent = localProxy
+    ? 'Connect through the local AIS proxy. Your key is not included in reports.'
+    : 'Live AIS requires npm start on localhost. This hosted simulation does not need a key.';
   document.getElementById('sp-apikey').value = getApiKey();
   document.getElementById('settings-error').textContent = '';
   const panel = document.getElementById('settings-panel');
