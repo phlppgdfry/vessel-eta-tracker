@@ -2,6 +2,8 @@
 
 Vessel rows now use larger text and fewer badges. Delays appear first by default; arrival-time sorting remains available. Search, keyboard detail opening and CSV export are covered on desktop and mobile. Leaflet and Chart.js are served from locked dependencies, so their CDNs are not required at runtime.
 
+The demo explicitly classifies its eight container vessels as AIS cargo type 70. Browser checks verify cargo includes all eight, tanker returns an explained empty result, and All restores the list.
+
 Current checks: production build, functional browser flows on desktop/mobile, CSV/download contents and no uncaught browser errors. PDF source reconciliation and gate-validator checks run in their respective CI pipelines. Updated screenshots are actual renders of the production artifacts.
 
 ## Earlier release evidence

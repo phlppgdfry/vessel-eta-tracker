@@ -977,7 +977,7 @@ function startDemo() {
       mmsi:s.mmsi, name:s.name, svc:s.svc, voy:s.voy, berth:s.berth,
       lat:s.lat, lon:s.lon, sog:s.sog, cog:bearing(s.lat,s.lon,PORT.lat,PORT.lon),
       distKm:Math.round(dist), calcEta, schedEta, dev:s.dev,
-      dest:'BEZEE', lastSeen:new Date()
+      shipType:70, dest:'BEZEE', lastSeen:new Date()
     };
     putMarker(s.mmsi);
     if (Math.abs(s.dev)>=CFG.critMin) fireAlert(s.mmsi);

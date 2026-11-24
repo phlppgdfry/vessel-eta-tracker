@@ -18,6 +18,10 @@ test('simulation is readable, prioritised, searchable and exportable without a k
   const rows=page.locator('#vessel-list .vrow'); await expect(rows).toHaveCount(8);
   await expect(page.getByLabel('Sort vessels')).toHaveValue('attention');
   await expect(rows.first()).toContainText('Late');
+  await page.locator('#ft-cargo').click(); await expect(rows).toHaveCount(8);
+  await page.locator('#ft-tank').click(); await expect(rows).toHaveCount(0);
+  await expect(page.getByText('No matches',{exact:true})).toBeVisible();
+  await page.locator('#ft-all').click(); await expect(rows).toHaveCount(8);
   const name=await rows.first().locator('.vname').innerText();
   expect(await rows.first().locator('.vname').evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(14);
   const search=page.getByLabel('Search vessels'); await search.fill(name); await expect(rows).toHaveCount(1);

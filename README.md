@@ -166,4 +166,4 @@ Vessel rows now use larger text and fewer badges. Delays appear first by default
 
 Browser checks run before every default-branch Pages deployment, in Chromium at 1440×1000 and 390×844. They exercise filters, empty states and actual downloads. Run `npm ci` followed by `npm run test:e2e`. CI retains the HTML report and failure traces. Mobile here means Chromium emulation, not a physical-device or Safari certification.
 
-[Current refined source release — 24 November 2026](https://github.com/phlppgdfry/vessel-eta-tracker/releases/tag/portfolio-2026-11-24). Browser checks also run on pull requests.
+[Current refined source release — 24 November 2026](https://github.com/phlppgdfry/vessel-eta-tracker/releases/tag/portfolio-2026-11-24.1). Browser checks also run on pull requests.
