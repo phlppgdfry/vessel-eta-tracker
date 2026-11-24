@@ -11,6 +11,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - run: node --test .github/scripts/deploy-pages.test.mjs
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
