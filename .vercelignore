@@ -1,0 +1,12 @@
+index-v2.html
+.github
+docs
+tests
+*.test.js
+*.test.cjs
+.env*
+*.key
+playwright-report
+test-results
+site
+vendor

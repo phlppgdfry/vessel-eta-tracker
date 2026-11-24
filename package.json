@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "npm run build && node server.js",
-    "test": "node --test server.test.js",
+    "test": "node --test server.test.js live/public-server.test.cjs",
     "install-deps": "npm install",
     "build": "node scripts/build-demo.cjs",
     "test:e2e": "npm run build && playwright test"
@@ -16,7 +16,7 @@
     "leaflet": "1.9.4"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "24.x"
   },
   "license": "MIT",
   "devDependencies": {

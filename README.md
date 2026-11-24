@@ -1,174 +1,105 @@
-# VesselETA — CSP Zeebrugge
+# VesselETA — Zeebrugge approach monitor
 
 [![Portfolio demo](https://github.com/phlppgdfry/vessel-eta-tracker/actions/workflows/portfolio-pages.yml/badge.svg)](https://github.com/phlppgdfry/vessel-eta-tracker/actions/workflows/portfolio-pages.yml)
 
-## Interactive portfolio
+**[Open live AIS](https://phlppgdfry.github.io/vessel-eta-tracker/)** · **[Open simulation](https://phlppgdfry.github.io/vessel-eta-tracker/?mode=demo)** · [Walkthrough](docs/PORTFOLIO.md) · [Verification](docs/VERIFICATION.md)
 
-**[Open the demo](https://phlppgdfry.github.io/vessel-eta-tracker/)** · [Two-minute walkthrough](docs/PORTFOLIO.md) · [Verification notes](docs/VERIFICATION.md)
+Live positions around Zeebrugge arrive through a server-side AISStream relay.
+Visitors need no key. The optional simulation demonstrates arrival deviations,
+berth conflicts and handover planning with eight clearly labelled sample vessels.
+This is an independent portfolio project, not an endorsed CSP system.
 
-No credentials required. The public demo uses synthetic sample data; it is an
-independent portfolio project, not an operating terminal or ERP environment.
+![Actual live AIS dashboard](docs/screenshots/live-desktop.png)
 
-![Actual desktop demo](docs/screenshots/desktop.png)
-
-<details><summary>Mobile preview</summary>
-
-<img src="docs/screenshots/mobile.png" width="300" alt="Mobile view of the working portfolio demo" />
-
+<details><summary>Mobile live preview</summary>
+<img src="docs/screenshots/live-mobile.png" width="300" alt="Mobile view of actual AIS vessel positions" />
 </details>
 
----
+## Operational purpose
 
-> Real-time vessel tracking dashboard for container terminal operations. Compares live AIS positions against the planned N4 arrival schedule and alerts planners when ships deviate from their ETA — before they arrive.
+A delayed vessel affects crane allocation, yard preparation and truck appointments.
+VesselETA brings position, speed and distance into one searchable map and vessel list.
+The simulation shows how planners could compare estimated arrivals with an operational
+schedule. **No production N4 schedule or berth plan is connected.**
 
-**[▶ Live Demo](https://phlppgdfry.github.io/vessel-eta-tracker/)** — no API key needed, demo launches automatically.
+| Capability | Live AIS | Simulation |
+|---|---|---|
+| Position, course and speed | AISStream reports | Generated scenario |
+| Destination and vessel type | When broadcast by the vessel | Sample data |
+| Estimated arrival | Straight-line distance / reported speed | Same calculation |
+| Scheduled arrival, voyage and berth | Unavailable | Synthetic examples |
+| Deviation and berth-conflict alerts | Unavailable without an operational plan | Interactive scenario |
+| Search, vessel details, CSV and printable report | Available, with source labels | Available, with source labels |
 
----
+ETA is an illustrative distance/speed estimate, not a confirmed port call. It does
+not model fairways, pilotage, tides, stops or actual berth readiness. A vessel in
+the monitored area is not necessarily heading to Zeebrugge.
 
-## The problem
+## Data flow
 
-Disrupted sailing schedules are one of the biggest operational challenges for container terminals. When a vessel arrives 6 hours late:
-
-- The **yard plan is wrong** — containers are pre-positioned for a ship that isn't coming
-- **Crane crews are misallocated** — expensive idle time or unplanned overtime
-- **Truck appointments don't match** — gate congestion, missed slots
-- **Vessel stack cutoffs** are missed — cargo rolled to next departure
-
-Early ETA visibility gives operations the time to adapt. This tool surfaces deviations **while the vessel is still at sea**.
-
----
-
-## Features
-
-| Feature | Description |
-|---|---|
-| **Demo mode** | Auto-starts with 8 simulated vessels — no API key required |
-| **Live AIS feed** | Real vessel positions via aisstream.io WebSocket |
-| **KPI dashboard** | Vessels tracked · On-time % · Average deviation · Critical alerts |
-| **Directional markers** | Triangle icons rotate to show vessel heading (COG) |
-| **ETA deviation** | Calculated ETA vs N4 scheduled ETA, colour-coded by severity |
-| **Alert log** | Critical deviations (>120 min) trigger toast + alert log |
-| **Vessel detail** | Voyage, service line, scheduled vs calculated ETA, approach line on map |
-| **Search & filter** | Search vessels and destinations; sort by delay priority or arrival time |
-| **ETA chart** | Deviation history for the last 30 updates |
-| **CSV export** | One-click export of current vessel state |
-
----
-
-## How it works
-
-```
-Live AIS feed (aisstream.io WebSocket)
-        │
-        ▼
-Filter vessels in bounding box  ←  North Sea / English Channel approach
-        │
-        ▼
-Position + speed  →  estimate arrival from straight-line distance
-        │
-        ▼
-Compare against N4 planned schedule
-        │
-        ▼
-Deviation > threshold?  →  Alert (toast + log)
+```text
+AISStream → Vercel server (private key, fixed monitoring area)
+                    ↓ validated public vessel fields only
+             GitHub Pages / Vercel dashboard
 ```
 
----
+The public relay is read-only. It shares an upstream subscription between visitors
+on the same warm instance, limits payloads and clients, and closes sessions before
+the function duration limit. The browser reconnects with backoff. An outage stays
+visible; the site never silently replaces live positions with sample vessels.
+The short-lived in-memory cache is not a vessel-history database or a global
+connection coordinator. This setup targets portfolio traffic; AISStream account
+connection limits still apply across separately scaled instances.
 
-## Quick start
+## Run locally
 
-### Option 1 — Demo (no setup)
+Use Node 24:
 
-1. Open the hosted demo, or run `npm ci && npm start` and visit `http://localhost:3000`
-2. Demo launches automatically with 8 simulated vessels
-
-Or use the [hosted version](https://phlppgdfry.github.io/vessel-eta-tracker/).
-
-### Option 2 — Live AIS data
-
-1. Obtain your own AISStream key from [aisstream.io](https://aisstream.io).
-2. Run `npm ci` and `npm start` (Node 22+); open `http://localhost:3000`.
-3. Open Settings, enter the key, and connect through the local `/ais` WebSocket proxy.
-4. Positions appear when vessels broadcast inside the monitored area. The key stays in the current browser session; never commit it.
-
-The GitHub Pages version is an automatic simulation. It cannot host the Node proxy.
-No production N4 schedule is connected. The browser libraries are copied from
-locked npm dependencies during `npm run build`; map tiles still use OpenStreetMap
-and optional weather uses Open-Meteo. A failed weather request does not stop the demo.
-
----
-
-## ETA deviation colour coding
-
-Defaults are shown below; Settings updates the warning and critical thresholds throughout the dashboard. On-time KPI uses the absolute deviation, and critical-delay KPI counts late arrivals at or above the critical threshold.
-
-| Colour | Default badge meaning |
-|---|---|
-| Blue | At least 30 minutes early |
-| Green | Within the 30-minute warning window |
-| Yellow | 30 to under 120 minutes late |
-| Orange | 120 to under 240 minutes late |
-| Red | At least 240 minutes late (twice the critical threshold) |
-
-Critical notifications start at 120 minutes by default. Early-arrival and berth-conflict notifications can be switched off independently; underlying operating KPIs remain visible. Map switches control real layers. The terminal name is used in the printable handover report.
-
----
-
-## Tech stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | HTML / CSS / JavaScript; npm build vendors browser libraries |
-| Map | [Leaflet.js](https://leafletjs.com) + OpenStreetMap tiles |
-| Charts | [Chart.js](https://chartjs.org) |
-| AIS data | [aisstream.io](https://aisstream.io) — free WebSocket API |
-| Schedule | Simulated N4 data (production: replace with N4 REST API) |
-
-No frontend framework. A small Node/`ws` server provides the optional local AIS proxy; GitHub Pages serves the built simulation.
-
----
-
-## Production integration points
-
-To go from demo to production, replace:
-
-```javascript
-// In index.html — the N4 schedule array
-const N4 = [
-  { mmsi: '477307900', name: 'COSCO SHIPPING AQUARIUS', eta: oh(-0.5), svc: 'AEX', voy: 'AEX-041W' },
-  // ...
-];
+```sh
+npm ci
+npm start
 ```
 
-With a fetch from your N4 REST API:
+Open `http://localhost:3000/?mode=demo` for the simulation. A personal live key can
+be entered in Settings on localhost; it is held in session storage and sent only
+to the local `/ais` proxy. The public website disables this key field and uses
+the server-owned relay instead.
 
-```javascript
-const N4 = await fetch('/api/n4/expected-arrivals').then(r => r.json());
+The public relay accepts the two deployed website origins. For local development
+of the relay, pass an explicit local origin to `createPublicServer`; never expose
+the local personal-key proxy as a public service.
+
+## Deploy the public relay
+
+The linked Vercel project is `kippiegs-projects/vessel-eta-live`.
+Store `AISSTREAM_API_KEY` as a **Secret, Production** environment variable in that
+project, then deploy with `vercel --prod`. Never put the value in source, command
+arguments, a `NEXT_PUBLIC_` variable, a browser bundle or GitHub Pages.
+
+- Frontend and relay: [vessel-eta-live.vercel.app](https://vessel-eta-live.vercel.app/)
+- Public status: [/api/live](https://vessel-eta-live.vercel.app/api/live) (configuration status, no secret)
+- GitHub Pages publishes only the explicit `site/` build artifact.
+- Vercel deploys the same frontend and the `api/live.mjs` Node function in Paris.
+- Both sites connect to `wss://vessel-eta-live.vercel.app/api/live`.
+
+After a key rotation, redeploy and run `node scripts/check-live.cjs`; this probes
+the public endpoint without reading the key. The previously exposed credential
+was disabled in the provider account on 24 November 2026.
+
+## Verification
+
+```sh
+npm test
+npm run test:e2e
+node --test .github/scripts/deploy-pages.test.mjs
+npm audit
 ```
 
-A production connection also needs authenticated schedule access, schema validation, timezone handling, secure proxy deployment and operational acceptance testing. ETA here is a straight-line distance/speed estimate; it does not model nautical routes, tides, pilotage or berth availability.
+Tests cover the relay subscription, sanitization, origin rejection, shared
+connection, read-only clients, provider errors and session expiry. Desktop and
+mobile browser tests cover simulation, live-mode separation, failure states,
+settings, filtering, exports and safe printing. CI runs these before Pages deploys.
 
----
-
-## Why Zeebrugge
-
-CSP Zeebrugge handles vessels on the AEX, EC2, and FE4 service loops — connecting the UK, Ireland, Scandinavia and the Baltics through the English Channel and southern North Sea. In disrupted alliance seasons, vessels can run 6–24 hours off schedule. For a terminal processing 1M+ TEU per year, early visibility of those deviations directly reduces rehandles, overtime, and crane idle time.
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE)
-
-## Earlier portfolio release
-
-[Final source snapshot — 15 November 2026](https://github.com/phlppgdfry/vessel-eta-tracker/releases/tag/portfolio-2026-11-15) · [Verification evidence](docs/VERIFICATION.md)
-
-
-## Portfolio refinement — 24 November 2026
-
-Vessel rows now use larger text and fewer badges. Delays appear first by default; arrival-time sorting remains available. Search, keyboard detail opening and CSV export are covered on desktop and mobile. Leaflet and Chart.js are served from locked dependencies, so their CDNs are not required at runtime.
-
-Browser checks run before every default-branch Pages deployment, in Chromium at 1440×1000 and 390×844. They exercise filters, empty states and actual downloads. Run `npm ci` followed by `npm run test:e2e`. CI retains the HTML report and failure traces. Mobile here means Chromium emulation, not a physical-device or Safari certification.
-
-[Current refined source release — 24 November 2026](https://github.com/phlppgdfry/vessel-eta-tracker/releases/latest). Browser checks also run on pull requests.
+Leaflet and Chart.js come from locked npm dependencies. Map tiles use attributed
+OpenStreetMap and optional weather uses Open-Meteo. Weather or tile failures do
+not convert simulated positions into live data.

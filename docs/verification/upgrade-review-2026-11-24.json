@@ -1,6 +1,6 @@
 {
   "date": "2026-11-24",
-  "scope": "Portfolio refinement; synthetic data",
+  "scope": "Portfolio refinement and secure public live AIS integration",
   "browser": {
     "engine": "Chromium",
     "viewports": [
@@ -13,7 +13,7 @@
         844
       ]
     ],
-    "functionalChecks": 4,
+    "functionalChecks": 8,
     "uncaughtPageErrors": 0
   },
   "limitations": [
@@ -28,10 +28,21 @@
     "horizontalPageOverflow": false,
     "browserPath": "Playwright; Browser plugin not available",
     "aisstreamCredential": {
-      "status": "disabled",
-      "verification": "Authenticated provider UI showed Disabled on 2026-11-24",
-      "newCredentialCreated": false,
-      "publicDemoMode": "synthetic simulation"
+      "status": "rotated",
+      "verification": "Old key disabled in authenticated AISStream UI; owner saved replacement as Secret Production variable in Vercel",
+      "newCredentialCreated": true,
+      "publicDemoMode": "live AIS by default; explicit simulation available",
+      "secretValueReadByAgent": false
     }
+  },
+  "liveAIS": {
+    "relay": "https://vessel-eta-live.vercel.app/api/live",
+    "provider": "AISStream",
+    "serverTests": 9,
+    "browserChecks": 8,
+    "publicWebSocketProbe": "pass: three real messages from three vessels",
+    "browserReception": "pass: live status and 60 relevant vessels; AIS received age 0 seconds",
+    "operationalScheduleConnected": false,
+    "probeLimitation": "Initial parallel probe reported an unavailable upstream; subsequent probe and continuing browser reception passed. Provider coverage and connection limits apply."
   }
 }

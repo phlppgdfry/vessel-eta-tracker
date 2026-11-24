@@ -60,4 +60,23 @@ The finalized source is preserved by the `portfolio-2026-11-15` release tag.
 
 ## External account action — resolved
 
-Resolved on 24 November 2026: after the owner authenticated, the previously exposed AISStream credential was matched to the historical repository credential without displaying its value. It was disabled in the authenticated provider account; the UI confirmed Disabled and offered Re-enable. No new credential was generated. Public simulation requires no key. Optional live AIS needs a fresh private key and the local server proxy; public real-time AIS would require a separately deployed secure backend. Two pre-existing local drafts remain outside the published artifact and were preserved.
+Resolved on 24 November 2026: after the owner authenticated, the previously exposed AISStream credential was matched to the historical repository credential without displaying its value. It was disabled in the authenticated provider account; the UI confirmed Disabled and offered Re-enable. A replacement credential was subsequently created by the owner and saved as a secret Production variable in the separate Vercel relay project. The value was not read into source or chat. Public live AIS was verified through the deployed relay; simulation remains a separate explicit mode. Two pre-existing local drafts remain outside the published artifact and were preserved.
+
+
+## Secure public live AIS — 24 November 2026
+
+The owner saved `AISSTREAM_API_KEY` as a Secret for Production in
+`kippiegs-projects/vessel-eta-live`. The authenticated Vercel UI and CLI confirmed
+the variable exists; its value was not requested or logged. After redeployment,
+the public WebSocket delivered actual AIS positions and Chromium displayed
+ANDREA, MULTRATUG 3 and EVER ECHO in live mode with no synthetic schedule.
+
+Nine Node checks cover local file isolation and the relay; eight browser checks
+cover desktop and mobile, including mode changes and an unavailable feed. Eight
+Pages deployment checks cover artifact identity and deployment failure handling.
+Public live reception is a point-in-time integration check, not a guarantee of
+continuous provider coverage or unlimited concurrent connections.
+
+Live mode intentionally leaves schedule, deviation, critical delays and berth
+conflict KPIs unavailable. Reports and exports identify their data source. The
+previous screenshot pair shows the simulation; new live captures are separate.

@@ -19,6 +19,8 @@
 # Environment / secrets
 .env
 .env.local
+.env*.local
+.vercel/
 *.key
 
 # Logs
@@ -33,3 +35,4 @@ test-results/
 .venv/
 site/
 vendor/
+.vercel

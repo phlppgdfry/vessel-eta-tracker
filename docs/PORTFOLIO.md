@@ -1,38 +1,36 @@
 # VesselETA portfolio walkthrough
 
-1. Open the public demo: eight simulated vessels load automatically.
-2. Search a vessel and select its row to inspect its approach and planned ETA.
-3. Inspect berth overlaps and the arrival timeline.
-4. Export the current vessel state as CSV, or print the shift handover report.
-5. Stop the demo; it remains paused until a visitor explicitly supplies a key.
+1. Open the public dashboard: it connects to live AIS through a server-side relay.
+2. Search a vessel and select its row to inspect speed, destination and approach.
+3. Read the feed status and last-message age. Estimated ETA is distance/speed;
+   no operational schedule, confirmed arrival or berth assignment is implied.
+4. Export the current vessel state as CSV or print a report; both identify the source.
+5. Choose Demo, or open `?mode=demo`, for eight simulated vessels with planned
+   arrivals, deviations, berth overlaps and alerts. Choose Live AIS to return.
+   Changing modes clears the previous vessels and simulated timers.
 
-## Data and calculation boundary
+## Data boundary
 
-AIS positions, N4 schedule and ship specifications in the public demo are
-synthetic scenarios. Weather is separately fetched from Open-Meteo. Leaflet,
-Chart.js, fonts and OpenStreetMap tiles require internet access; a failed tile
-provider does not turn sample positions into real operational data.
+Live mode shows AISStream positions and reported vessel fields. The account key
+is private to the Vercel server; visitors do not supply or receive it. A feed
+failure is explicit and never silently starts the simulation.
 
-ETA uses straight-line distance and reported speed. It is not a navigational
-prediction and does not model pilotage, fairways, tides or actual berth readiness.
-No live N4 integration is included. This is an independent portfolio, not an
-endorsed CSP product.
+Simulation positions, schedules and specifications are synthetic scenarios.
+No production N4 integration is included. ETA is a straight-line estimate and
+does not model pilotage, fairways, tides or actual berth readiness.
+This is an independent portfolio, not an endorsed CSP product.
 
-## Local live-feed option
+Leaflet and Chart.js are served from locked dependencies. OpenStreetMap tiles,
+fonts and optional Open-Meteo weather still require internet access.
+
+## Local development
 
 ```sh
 npm ci
 npm start
 ```
 
-Open `http://localhost:3000`, then Settings and supply your own AISStream key.
-The Node server proxies the WebSocket feed because browsers may reject a direct
-connection. The key is held in session storage, not bundled or logged. The public
-GitHub Pages host deliberately does not attempt direct live AIS connections.
-
-The HTTP server serves an allowlist of public dashboard files, not the repository.
-
-
-## Updated walkthrough — 24 November 2026
-
-Vessel rows now use larger text and fewer badges. Delays appear first by default; arrival-time sorting remains available. Search, keyboard detail opening and CSV export are covered on desktop and mobile. Leaflet and Chart.js are served from locked dependencies, so their CDNs are not required at runtime.
+Use Node 24 and open `http://localhost:3000/?mode=demo`. A personal AISStream key
+can be entered on localhost to use the local WebSocket proxy; it is held only
+in session storage. The public read-only relay is separate from that personal
+proxy. See the [README](../README.md) for deployment and verification.

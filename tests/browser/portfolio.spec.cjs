@@ -14,7 +14,7 @@ test('simulation is readable, prioritised, searchable and exportable without a k
   // Keep third-party weather and tile availability outside deterministic functional CI.
   await page.route('**/api.open-meteo.com/**',route=>route.abort());
   await page.route('**/tile.openstreetmap.org/**',route=>route.abort());
-  await page.goto('/');
+  await page.goto('/?mode=demo');
   const rows=page.locator('#vessel-list .vrow'); await expect(rows).toHaveCount(8);
   await expect(page.getByLabel('Sort vessels')).toHaveValue('attention');
   await expect(rows.first()).toContainText('Late');
@@ -36,7 +36,7 @@ test('simulation is readable, prioritised, searchable and exportable without a k
 test('settings control real map layers, validate thresholds and escape printable terminal text', async ({page}) => {
   await page.route('**/api.open-meteo.com/**',route=>route.abort());
   await page.route('**/tile.openstreetmap.org/**',route=>route.abort());
-  await page.goto('/'); await expect(page.locator('#vessel-list .vrow')).toHaveCount(8);
+  await page.goto('/?mode=demo'); await expect(page.locator('#vessel-list .vrow')).toHaveCount(8);
   const settings=page.getByRole('button',{name:'Settings',exact:true}); await settings.click();
   const dialog=page.getByRole('dialog',{name:'Settings',exact:true});await expect(dialog).toBeVisible();
   for (const [name,key] of [['Approach lane','approach'],['Pilot station marker','pilot'],['Anchorage zone','anchorage']]) {
@@ -70,11 +70,81 @@ test('settings control real map layers, validate thresholds and escape printable
     const response=await page.request.get('http://127.0.0.1:4174'+url.pathname+url.search);
     await route.fulfill({response});
   });
-  await page.goto('http://portfolio.test:4174/');await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await page.goto('http://portfolio.test:4174/?mode=demo');await page.getByRole('button',{name:'Settings',exact:true}).click();
   await expect(page.getByLabel('API Key (aisstream.io)',{exact:true})).toBeDisabled();
   await expect(page.getByRole('button',{name:'Connect with this key',exact:false})).toBeDisabled();
   await expect(page.locator('#ais-connection-help')).toContainText('does not need a key');
   await page.evaluate(()=>applyApiKey());
   expect(await page.evaluate(()=>sessionStorage.getItem(LS_KEY))).toBeNull();
   expect(await page.evaluate(()=>demoMode)).toBe(true);
+});
+
+
+test('public live data stays separate from simulated planning and resets on mode switches', async ({page}) => {
+  await page.route('**/api.open-meteo.com/**', route => route.abort());
+  await page.route('**/tile.openstreetmap.org/**', route => route.abort());
+  await page.addInitScript(() => {
+    class Feed {
+      static OPEN = 1;
+      readyState = 0;
+      constructor(url) {
+        window.feedURLs = [...(window.feedURLs || []), url];
+        setTimeout(() => {
+          this.readyState = 1; this.onopen?.();
+          this.onmessage?.({data: JSON.stringify({MessageType:'PositionReport',
+            MetaData:{MMSI:477307900,ShipName:'REAL TEST VESSEL',latitude:51.5,longitude:2.9},
+            Message:{PositionReport:{Sog:12,Cog:125}}})});
+        }, 20);
+      }
+      send(value) { window.clientWrites = [...(window.clientWrites || []), value]; }
+      close() { this.readyState = 3; this.onclose?.(); }
+    }
+    window.WebSocket = Feed;
+  });
+  await page.goto('/');
+  const rows = page.locator('#vessel-list .vrow');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('REAL TEST VESSEL');
+  await expect(page.locator('#stext')).toHaveText('Live AIS · aisstream.io');
+  await expect(page.locator('#live-ct')).toHaveText('1 live');
+  await expect(page.locator('#k-ontime')).toHaveText('—');
+  await expect(page.locator('#k-crits')).toHaveText('—');
+  expect(await page.evaluate(()=>window.clientWrites || [])).toEqual([]);
+  expect(await page.evaluate(()=>Object.values(vessels).map(v=>({berth:v.berth,dev:v.dev,eta:v.schedEta}))))
+    .toEqual([{berth:undefined,dev:undefined,eta:undefined}]);
+  await rows.first().click();
+  await expect(page.locator('#dinn')).toContainText('straight-line speed estimate');
+  await expect(page.locator('#dinn')).not.toContainText('Shipping Agent');
+  await page.evaluate(()=>vessels['477307900'].name='=1+1');
+  const liveExport = await downloaded(page,()=>page.getByTitle('Export CSV',{exact:true}).click());
+  expect(liveExport.data.toString()).toContain('AISStream live');
+  expect(liveExport.data.toString()).toContain("'=1+1");
+  expect(liveExport.data.toString()).not.toContain('AEX-041W');
+  await page.locator('#demo-btn').click();
+  await expect(rows).toHaveCount(8);
+  await expect(page.locator('#live-ct')).toHaveText('8 simulated');
+  await page.locator('#live-btn').click();
+  await expect(rows).toHaveCount(1);
+  await page.waitForTimeout(3200);
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('REAL TEST VESSEL');
+});
+
+test('a failed live feed remains explicit and never inserts simulated vessels', async ({page}) => {
+  await page.route('**/api.open-meteo.com/**', route => route.abort());
+  await page.route('**/tile.openstreetmap.org/**', route => route.abort());
+  await page.addInitScript(() => {
+    window.WebSocket = class {
+      static OPEN = 1;
+      constructor() { setTimeout(()=>this.onerror?.(),20); }
+      close() {}
+    };
+  });
+  await page.goto('/?mode=live');
+  await expect(page.locator('#stext')).toHaveText('Connection error');
+  await expect(page.locator('#vessel-list .vrow')).toHaveCount(0);
+  expect(await page.evaluate(()=>demoMode)).toBe(false);
+  await page.locator('#demo-btn').click();
+  await expect(page.locator('#vessel-list .vrow')).toHaveCount(8);
+  await expect(page.locator('#stext')).toContainText('Simulated AIS');
 });

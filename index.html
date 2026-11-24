@@ -339,6 +339,7 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
   </div>
 
   <div class="h-right">
+    <button class="btn btn-demo" id="live-btn" onclick="startLive()">Live AIS</button>
     <button class="btn btn-demo" id="demo-btn" onclick="toggleDemo()">▶ Demo</button>
     <div class="h-div"></div>
     <button class="btn-icon" title="Shift handover report" aria-label="Shift handover report" onclick="printReport()">🖨</button>
@@ -350,7 +351,7 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
 <!-- ── KPI Bar ── -->
 <div id="kpi-bar">
   <div class="kpi">
-    <span class="kpi-label">Next Arrival</span>
+    <span class="kpi-label" id="next-arrival-label">Distance ETA</span>
     <span class="kpi-val cv-blue" id="k-next-rel">—</span>
     <span class="kpi-sub" id="k-next-name">—</span>
   </div>
@@ -389,7 +390,7 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
     <div class="wx-src" id="wx-src">Loading weather…</div>
   </div>
   <div class="kpi" style="border-right:none;margin-left:auto;">
-    <span class="kpi-label">Current Time</span>
+    <span class="kpi-label" id="feed-time-label">Last AIS received</span>
     <span class="kpi-val cv-muted" style="font-size:.82rem;font-weight:600" id="k-upd">—</span>
     <span class="kpi-sub" id="k-feed">—</span>
   </div>
@@ -430,7 +431,7 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
     </div>
 
     <div class="sec-head">
-      <span class="sec-title">Incoming Vessels</span>
+      <span class="sec-title" id="vessel-section-label">Area Vessels</span>
       <span class="sec-badge" id="live-ct">0 live</span>
     </div>
     <div id="vessel-list">
@@ -454,7 +455,7 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
     </div>
 
     <div class="chart-sec">
-      <h3>ETA Deviation History (min)</h3>
+      <h3 id="chart-source-label">Schedule analysis</h3>
       <div class="eta-chart-frame"><canvas id="etaChart"></canvas></div>
     </div>
   </div>
@@ -572,8 +573,10 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
 
 <script>
 // ─── Config ───────────────────────────────────────────────────────────────────
-// Live credentials are supplied explicitly by the visitor, never bundled.
+// Public live credentials exist only on the relay server. Local overrides use session storage.
 const DEFAULT_API_KEY = '';
+const LIVE_WS_URL = 'wss://vessel-eta-live.vercel.app/api/live';
+let publicLive = false, lastAisReceived = null;
 let suppressToasts = false;
 const LS_KEY = 'vesseleta_apikey';
 
@@ -581,14 +584,8 @@ function getApiKey() {
   return sessionStorage.getItem(LS_KEY) || DEFAULT_API_KEY;
 }
 
-// Use local proxy when running via server.js, otherwise try direct (may fail in browser)
 function getWsUrl() {
-  const loc = window.location;
-  if (loc.hostname === 'localhost' || loc.hostname === '127.0.0.1') {
-    return `ws://${loc.host}/ais`;
-  }
-  // On a real domain (e.g. GitHub Pages) try direct aisstream connection
-  return 'wss://stream.aisstream.io/v0/stream';
+  return publicLive ? LIVE_WS_URL : `ws://${location.host}/ais`;
 }
 
 function buildSubscription(key) {
@@ -636,7 +633,7 @@ const DEMO_SEED = [
   { mmsi:'477609800', name:'CSCL GLOBE',              svc:'AEX', voy:'AEX-044W', berth:'B4', lat:51.72, lon:3.75, sog:11.8, dev:44   },
 ];
 
-// Expected arrivals schedule (for cross-referencing live vessels)
+// Synthetic schedule: used exclusively in simulation mode.
 const SCHEDULE = {};
 DEMO_SEED.forEach(s => { SCHEDULE[s.mmsi] = s; SCHEDULE[s.name] = s; });
 
@@ -775,7 +772,7 @@ function renderTimeline() {
   const hr = new Date().getHours();
   const shift = hr>=6&&hr<14?'Early Shift 06:00–14:00':hr>=14&&hr<22?'Late Shift 14:00–22:00':'Night Shift 22:00–06:00';
   document.getElementById('tl-shift-lbl').textContent =
-    new Date().toLocaleDateString('nl-BE',{day:'2-digit',month:'short',year:'numeric'})+' · '+shift;
+    demoMode ? new Date().toLocaleDateString('nl-BE',{day:'2-digit',month:'short',year:'numeric'})+' · '+shift : 'No berth plan connected · live AIS positions only';
 
   BERTHS.forEach(berth => {
     const rowEl = document.getElementById('tlr-'+berth.id);
@@ -870,9 +867,9 @@ function autoConnect(key) {
   if (ws && ws.readyState===WebSocket.OPEN) return;
   if (demoMode) return;
   if (isConnecting) return;
-  if (!(key || getApiKey())) { setStatus('', 'Demo paused'); hideConnOverlay(); return; }
-  if (!['localhost', '127.0.0.1'].includes(location.hostname)) {
-    toast('warn', 'Local proxy required', 'Run npm start locally to connect live AIS. The public site is a simulated portfolio demo.');
+  if (!publicLive && !(key || getApiKey())) { setStatus('', 'Demo paused'); hideConnOverlay(); return; }
+  if (!publicLive && !['localhost', '127.0.0.1'].includes(location.hostname)) {
+    toast('warn', 'Local proxy required', 'Use Live AIS for the public feed, or run npm start for a personal local key.');
     return;
   }
   isConnecting = true;
@@ -883,13 +880,13 @@ function autoConnect(key) {
 
   const wsUrl = getWsUrl();
   console.log('[AIS] Connecting to', wsUrl);
-  ws = new WebSocket(wsUrl);
+  const socket = new WebSocket(wsUrl);
+  ws = socket;
   ws.onopen = () => {
-    const sub = buildSubscription(key || getApiKey());
-    ws.send(sub);
+    if (ws !== socket || demoMode) return;
+    if (!publicLive) ws.send(buildSubscription(key || getApiKey()));
     isConnecting = false;
-    reconnectDelay = 3000;
-    setStatus('live','Live AIS · aisstream.io');
+    setStatus('conn','Connected · waiting for AIS');
     // Wait a moment for first data before hiding overlay
     showConnOverlay('Connected — waiting for vessel positions…');
     document.getElementById('msg-rate-el').style.display = 'flex';
@@ -906,9 +903,15 @@ function autoConnect(key) {
     }, 20000);
   };
   ws.onmessage = e => {
-    try { onAIS(JSON.parse(e.data)); } catch(_) {}
+    if (ws !== socket || demoMode) return;
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.relay === 'unavailable') { setStatus('err','AIS feed unavailable'); return; }
+      if (!msg.relay) onAIS(msg);
+    } catch(_) {}
   };
   ws.onerror = () => {
+    if (ws !== socket || demoMode) return;
     isConnecting = false;
     setStatus('err','Connection error');
     document.getElementById('reconnect-btn').style.display = '';
@@ -916,6 +919,7 @@ function autoConnect(key) {
     scheduleReconnect();
   };
   ws.onclose = () => {
+    if (ws !== socket || demoMode) return;
     isConnecting = false;
     if (!demoMode) {
       setStatus('','Disconnected');
@@ -933,10 +937,11 @@ function scheduleReconnect() {
   reconnectTimer = setTimeout(() => {
     reconnectDelay = Math.min(reconnectDelay * 1.6, 45000);
     autoConnect();
-  }, reconnectDelay);
+  }, Math.round(reconnectDelay * (0.8 + Math.random() * 0.4)));
 }
 
 function doReconnect() {
+  if (demoMode) { startLive(); return; }
   if (ws) { try { ws.close(); } catch(_){} ws = null; }
   reconnectDelay = 3000;
   isConnecting = false;
@@ -946,7 +951,7 @@ function doReconnect() {
 
 function applyApiKey() {
   if (!['localhost', '127.0.0.1'].includes(location.hostname)) {
-    document.getElementById('settings-error').textContent = 'Live AIS requires npm start on localhost. The hosted simulation does not need a key.';
+    document.getElementById('settings-error').textContent = 'Public live AIS uses the secure server. Visitors do not enter a key.';
     return;
   }
   const k = document.getElementById('sp-apikey').value.trim();
@@ -955,7 +960,9 @@ function applyApiKey() {
   if (ws) { try { ws.close(); } catch(_){} ws = null; }
   isConnecting = false;
   reconnectDelay = 3000;
-  if (demoMode) stopDemo();
+  resetFeed();
+  demoMode = false; publicLive = false;
+  updateModeButtons();
   autoConnect(k);
   closeSettings();
   toast('ok','Key saved','Connecting with new API key…');
@@ -965,6 +972,8 @@ function applyApiKey() {
 function toggleDemo() { demoMode ? stopDemo() : startDemo(); }
 
 function startDemo() {
+  resetFeed();
+  publicLive = false;
   suppressToasts = true;
   if (ws) { try { ws.close(); } catch(_){} ws = null; }
   clearTimeout(reconnectTimer);
@@ -998,9 +1007,17 @@ function startDemo() {
   toast('info','Demo Mode',''+DEMO_SEED.length+' vessels simulated in North Sea approach to Zeebrugge.');
 }
 
-function stopDemo() {
-  demoMode=false;
-  clearInterval(demoTimer); clearInterval(wxTimer); demoTimer=null; wxTimer=null;
+function resetFeed() {
+  clearInterval(demoTimer); demoTimer=null;
+  clearTimeout(reconnectTimer);
+  if (ws) { const old = ws; ws = null; old.onclose = null; old.onerror = null; old.onmessage = null; clearTimeout(old._hideTimer); old.close(); }
+  isConnecting = false;
+  lastAisReceived = null;
+  etaHist = []; alertLog = []; totalMsgsReceived = 0; msgCount = 0; msgRateVal = 0;
+  document.getElementById('alerts-list').innerHTML = '';
+  document.getElementById('alert-ct').textContent = '0';
+  updateChart();
+  document.getElementById('msg-rate-el').style.display = 'none';
   document.getElementById('demo-btn').textContent='▶ Demo';
   document.getElementById('demo-btn').className='btn btn-demo';
   document.getElementById('demo-pill').classList.remove('on');
@@ -1012,11 +1029,22 @@ function stopDemo() {
   selectedMmsi=null;
   document.getElementById('vdetail').classList.remove('open');
   renderList(); renderTimeline(); updateKPIs(); updateNextArrivalKPI(); updCounters();
-  // Reconnect live
+}
+
+function updateModeButtons() {
+  document.getElementById('demo-btn').textContent = demoMode ? '■ Stop Demo' : '▶ Demo';
+  document.getElementById('demo-btn').classList.toggle('active-demo', demoMode);
+  document.getElementById('demo-pill').classList.toggle('on', demoMode);
+}
+function startLive() {
+  resetFeed();
+  demoMode = false; publicLive = true;
+  updateModeButtons();
   reconnectDelay = 3000;
-  isConnecting = false;
+  renderList(); renderTimeline(); updateKPIs(); updCounters(); updTime();
   autoConnect();
 }
+function stopDemo() { startLive(); }
 
 function tickDemo() {
   const DT = 3/3600;
@@ -1077,8 +1105,7 @@ function onAIS(msg) {
   }
   // Handle aisstream.io error responses
   if (msg.error || msg.Error || msg.message || msg.status) {
-    const errTxt = cleanAisLabel(msg.error || msg.Error || msg.message || JSON.stringify(msg));
-    console.warn('[AIS error]', errTxt);
+    const errTxt = 'Provider rejected the connection. Check server configuration.';
     setStatus('err', 'AIS error: ' + errTxt.slice(0, 40));
     document.getElementById('reconnect-btn').style.display = '';
     toast('warn', 'AIS API Error', errTxt.slice(0, 120));
@@ -1089,16 +1116,19 @@ function onAIS(msg) {
   const lat=msg.MetaData?.latitude, lon=msg.MetaData?.longitude;
   if (!/^\d{9}$/.test(mmsi) || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat)>90 || Math.abs(lon)>180) return;
 
+  lastAisReceived = new Date();
+  reconnectDelay = 3000;
+  setStatus('live', 'Live AIS · aisstream.io');
   const mt = msg.MessageType;
   if (mt==='PositionReport') {
     const p=msg.Message?.PositionReport;
-    applyVessel(mmsi,{name,lat,lon,sog:p?.Sog||0,cog:p?.Cog||0,lastSeen:new Date()});
+    applyVessel(mmsi,{name,lat,lon,sog:p?.Sog||0,cog:p?.Cog??null,lastSeen:new Date()});
   } else if (mt==='StandardClassBPositionReport') {
     const p=msg.Message?.StandardClassBPositionReport;
-    applyVessel(mmsi,{name,lat,lon,sog:p?.Sog||0,cog:p?.Cog||0,lastSeen:new Date()});
+    applyVessel(mmsi,{name,lat,lon,sog:p?.Sog||0,cog:p?.Cog??null,lastSeen:new Date()});
   } else if (mt==='ExtendedClassBPositionReport') {
     const p=msg.Message?.ExtendedClassBPositionReport;
-    applyVessel(mmsi,{name:cleanAisLabel(p?.Name)||name,lat,lon,sog:p?.Sog||0,cog:p?.Cog||0,lastSeen:new Date()});
+    applyVessel(mmsi,{name:cleanAisLabel(p?.Name)||name,lat,lon,sog:p?.Sog||0,cog:p?.Cog??null,lastSeen:new Date()});
   } else if (mt==='ShipStaticData') {
     const sd=msg.Message?.ShipStaticData;
     applyVessel(mmsi,{name:cleanAisLabel(sd?.Name)||name,dest:cleanAisLabel(sd?.Destination),
@@ -1119,9 +1149,9 @@ function applyVessel(mmsi, data) {
     v.distKm = Math.round(dist);
     if (v.sog > 0.3) {
       v.calcEta = new Date(Date.now() + (dist/(v.sog*1.852))*3600000);
-    }
+    } else { delete v.calcEta; }
     // Match against expected arrivals schedule
-    const sched = SCHEDULE[mmsi] || SCHEDULE[v.name];
+    const sched = demoMode ? (SCHEDULE[mmsi] || SCHEDULE[v.name]) : null;
     if (sched && !v.schedEta && v.calcEta) {
       v.schedEta = new Date(v.calcEta.getTime() - sched.dev*60000);
       v.svc=sched.svc; v.voy=sched.voy; v.berth=sched.berth;
@@ -1171,7 +1201,7 @@ function putMarker(mmsi) {
     html:`<div style="width:${sz}px;height:${Math.round(sz*1.45)}px;background:${col};clip-path:polygon(50% 0%,93% 100%,50% 78%,7% 100%);transform:rotate(${v.cog||0}deg);${sel?`filter:drop-shadow(0 0 5px ${col})`:''}"></div>`,
     iconSize:[sz,Math.round(sz*1.45)], iconAnchor:[sz/2,Math.round(sz*.72)], className:''
   });
-  const sp=SPECS[mmsi]||{};
+  const sp=(demoMode ? SPECS[mmsi] : null)||{};
   const tip=[
     `<b>${v.name||mmsi}</b>`,
     `<span style="color:var(--muted)">${(v.sog||0).toFixed(1)} kn · ${v.distKm??'—'} km · Berth ${v.berth||'TBC'}</span>`,
@@ -1221,7 +1251,7 @@ function closeDetail() {
 
 function renderDetail(v) {
   if (!v) return;
-  const sp=SPECS[v.mmsi]||{};
+  const sp=(demoMode ? SPECS[v.mmsi] : null)||{};
   const col=etaCol(v.dev), sign=v.dev>0?'+':'';
   const status=v.dev===undefined?'—':Math.abs(v.dev)<CFG.warnMin?'On schedule':v.dev>0?'Running behind':'Running ahead';
   const conf=conflicts.find(c=>c.v1.mmsi===v.mmsi||c.v2.mmsi===v.mmsi);
@@ -1245,6 +1275,7 @@ function renderDetail(v) {
       </div>
       <button class="dclose" aria-label="Close vessel details" onclick="closeDetail()">✕</button>
     </div>
+    <p style="font-size:12px;color:var(--muted)">${demoMode ? 'Simulated positions and operational planning.' : 'Live AIS positions. ETA is a straight-line speed estimate, not a confirmed port call. No operational schedule connected.'}</p>
     <div class="dgrid">
       ${v.svc?`<div class="dfield"><span class="df-label">Service</span><span class="df-val" style="color:#5aabdb">${v.svc}</span></div>`:''}
       ${v.berth?`<div class="dfield"><span class="df-label">Berth</span><span class="df-val" style="color:#a07fe0">${v.berth}</span></div>`:''}
@@ -1338,7 +1369,7 @@ function renderList() {
     }
     const stale=v.lastSeen&&(Date.now()-v.lastSeen)>300000;
     const hasConf=conflicts.some(c=>c.v1.mmsi===v.mmsi||c.v2.mmsi===v.mmsi);
-    const sp=SPECS[v.mmsi]||{};
+    const sp=(demoMode ? SPECS[v.mmsi] : null)||{};
     const typeLbl = sp.type || shipTypeName(v.shipType);
     const destLbl = v.dest && !v.svc ? v.dest.trim().slice(0,10) : '';
     const hasZee = ZEE_DESTS.some(d=>((v.dest||'').toUpperCase()).includes(d));
@@ -1383,6 +1414,7 @@ function updateKPIs() {
     kotEl.className='kpi-val '+(pct>=80?'cv-green':pct>=60?'cv-yellow':'cv-red');
     document.getElementById('k-ontime-sub').textContent=onT.length+'/'+sched.length+' vessels';
   } else { kotEl.textContent='—'; kotEl.className='kpi-val cv-muted'; }
+  if (!sched.length) document.getElementById('k-ontime-sub').textContent='No operational schedule';
 
   const kavEl=document.getElementById('k-avgdev');
   if (avg!==null) {
@@ -1390,7 +1422,11 @@ function updateKPIs() {
     kavEl.className='kpi-val '+(Math.abs(avg)<CFG.warnMin?'cv-green':Math.abs(avg)<CFG.critMin?'cv-yellow':'cv-red');
   } else { kavEl.textContent='—'; kavEl.className='kpi-val cv-muted'; }
 
-  document.getElementById('k-crits').textContent=crits.length;
+  document.getElementById('k-crits').textContent=demoMode ? crits.length : '—';
+  if (!demoMode) {
+    document.getElementById('k-conf').textContent='—';
+    document.getElementById('k-conf-sub').textContent='No berth plan connected';
+  }
   document.getElementById('critical-threshold-label').textContent='≥'+CFG.critMin+' min behind';
 
   const appr = all.filter(v=>v.distKm!=null && v.distKm<25);
@@ -1506,7 +1542,7 @@ function openSettings() {
   document.getElementById('connect-key').disabled = !localProxy;
   document.getElementById('ais-connection-help').textContent = localProxy
     ? 'Connect through the local AIS proxy. Your key is not included in reports.'
-    : 'Live AIS requires npm start on localhost. This hosted simulation does not need a key.';
+    : 'Live AIS uses a secure server. The public site does not need a key from visitors. Simulation is available separately.';
   document.getElementById('sp-apikey').value = getApiKey();
   document.getElementById('settings-error').textContent = '';
   const panel = document.getElementById('settings-panel');
@@ -1555,7 +1591,7 @@ function printReport() {
   const term=String(document.getElementById('sp-term').value||'CSP Zeebrugge').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const shift=hr>=6&&hr<14?'Early Shift  06:00–14:00':hr>=14&&hr<22?'Late Shift  14:00–22:00':'Night Shift  22:00–06:00';
   document.getElementById('pr-meta').innerHTML=
-    `Terminal: ${term}<br>Date: ${now.toLocaleDateString('nl-BE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}<br>Shift: ${shift}<br>Printed: ${now.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'})}`;
+    `Terminal: ${term}<br>Date: ${now.toLocaleDateString('nl-BE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}<br>Shift: ${shift}<br>Printed: ${now.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'})}<br>Source: ${demoMode ? 'SIMULATION — synthetic positions and planning' : 'AISStream live positions — no operational schedule; ETA is a straight-line estimate'}`;
   document.getElementById('pr-gen').textContent=now.toLocaleString('nl-BE');
   const rows=Object.values(vessels).filter(v=>v.lat).sort((a,b)=>(a.distKm||999)-(b.distKm||999));
   document.getElementById('pr-tbody').innerHTML=rows.map(v=>{
@@ -1565,24 +1601,24 @@ function printReport() {
   }).join('');
   document.getElementById('pr-alerts-body').innerHTML=alertLog.length
     ? alertLog.map(a=>`<div class="pr-alert-item">${fmtTime(a.t)} — <b>${a.name}</b>: ${a.msg}</div>`).join('')
-    : '<p style="color:#888;font-size:.72rem">No active alerts at time of printing</p>';
+    : `<p style="color:#888;font-size:.72rem">${demoMode ? 'No active alerts at time of printing' : 'Schedule alerts unavailable: no operational schedule connected'}</p>`;
   document.getElementById('pr-conf-body').innerHTML=conflicts.length
     ? conflicts.map(c=>`<div class="pr-alert-item"><b>Berth ${c.berth}</b>: ${c.v1.name} and ${c.v2.name} — operations windows overlap</div>`).join('')
-    : '<p style="color:#888;font-size:.72rem">No berth conflicts detected</p>';
+    : `<p style="color:#888;font-size:.72rem">${demoMode ? 'No berth conflicts detected' : 'Berth conflicts unavailable: no berth plan connected'}</p>`;
   window.print();
 }
 
 // ─── CSV export ───────────────────────────────────────────────────────────────
 function doExport() {
-  const hdr=['Vessel','MMSI','Service','Voyage','Berth','Speed_kn','Dist_km','Calc_ETA','Sched_ETA','Dev_min','TEU','LOA_m','Draft_m','Agent','Lat','Lon'];
+  const hdr=['Source','Vessel','MMSI','Service','Voyage','Berth','Speed_kn','Dist_km','Calc_ETA','Sched_ETA','Dev_min','TEU','LOA_m','Draft_m','Agent','Lat','Lon'];
   const rows=Object.values(vessels).filter(v=>v.lat).map(v=>{
-    const sp=SPECS[v.mmsi]||{};
-    return [v.name||'',v.mmsi||'',v.svc||'',v.voy||'',v.berth||'',(v.sog||0).toFixed(1),v.distKm||'',
+    const sp=(demoMode ? SPECS[v.mmsi] : null)||{};
+    return [demoMode ? 'SIMULATION' : 'AISStream live',v.name||'',v.mmsi||'',v.svc||'',v.voy||'',v.berth||'',(v.sog||0).toFixed(1),v.distKm||'',
       v.calcEta?.toISOString()||'',v.schedEta?.toISOString()||'',v.dev??'',
       sp.teu||'',sp.loa||'',sp.draft||'',sp.agent||'',v.lat?.toFixed(5),v.lon?.toFixed(5)];
   });
   const a=document.createElement('a');
-  const url=URL.createObjectURL(new Blob([[hdr,...rows].map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
+  const url=URL.createObjectURL(new Blob([[hdr,...rows].map(r=>r.map(v=>'"'+(typeof v === 'string' && /^[\s]*[=+@-]/.test(v) ? "'" + v : String(v??'')).replaceAll('"','""')+'"').join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
   a.href=url;
   a.download=`csp-vessel-eta-${new Date().toISOString().slice(0,16).replace('T','-')}.csv`;
   a.click();
@@ -1672,14 +1708,18 @@ function setStatus(cls, txt) {
 }
 
 function updCounters() {
+  document.getElementById('next-arrival-label').textContent = demoMode ? 'Next Arrival' : 'Distance ETA';
+  document.getElementById('vessel-section-label').textContent = demoMode ? 'Incoming Vessels' : 'Area Vessels';
+  document.getElementById('chart-source-label').textContent = demoMode ? 'ETA Deviation History (min)' : 'No operational schedule connected';
   const n=Object.values(vessels).filter(v=>v.lat).length;
-  document.getElementById('live-ct').textContent=n+' live';
+  document.getElementById('live-ct').textContent=n+(demoMode ? ' simulated' : ' live');
   document.getElementById('h-vn').textContent=n;
 }
 function updTime() {
-  document.getElementById('k-upd').textContent=fmtTimeSec(new Date());
+  document.getElementById('feed-time-label').textContent=demoMode ? 'Simulation time' : 'Last AIS received';
+  document.getElementById('k-upd').textContent=demoMode ? fmtTimeSec(new Date()) : lastAisReceived ? fmtTimeSec(lastAisReceived) : '—';
   document.getElementById('k-feed').textContent=demoMode?'Simulated AIS':
-    (ws&&ws.readyState===WebSocket.OPEN?'Live AIS · aisstream.io':'Reconnecting…');
+    (lastAisReceived ? 'AIS received · ' + Math.round((Date.now()-lastAisReceived)/1000) + 's ago' : 'Waiting for real AIS');
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -1693,11 +1733,11 @@ window.addEventListener('load', () => {
   fetchWeather();
   setInterval(fetchWeather, 120000);
 
-  // The public portfolio always starts without credentials.
-  startDemo();
+  // Live AIS is the default; simulation always requires an explicit choice.
+  if (new URLSearchParams(location.search).get('mode') === 'demo') startDemo(); else startLive();
 
   // Live clock — update every second
-  setInterval(() => { document.getElementById('k-upd').textContent = fmtTimeSec(new Date()); }, 1000);
+  setInterval(updTime, 1000);
 
   // Periodic clock/timeline refresh
   setInterval(() => {
