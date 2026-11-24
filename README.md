@@ -100,12 +100,17 @@ and optional weather uses Open-Meteo. A failed weather request does not stop the
 
 ## ETA deviation colour coding
 
-| Colour | Meaning | Threshold |
-|---|---|---|
-| 🟢 Green | On schedule or early | < +30 min |
-| 🟡 Yellow | Moderate delay | +30 – +120 min |
-| 🟠 Orange | Significant delay | +120 – +240 min |
-| 🔴 Red | Critical — action required | > +240 min |
+Defaults are shown below; Settings updates the warning and critical thresholds throughout the dashboard. On-time KPI uses the absolute deviation, and critical-delay KPI counts late arrivals at or above the critical threshold.
+
+| Colour | Default badge meaning |
+|---|---|
+| Blue | At least 30 minutes early |
+| Green | Within the 30-minute warning window |
+| Yellow | 30 to under 120 minutes late |
+| Orange | 120 to under 240 minutes late |
+| Red | At least 240 minutes late (twice the critical threshold) |
+
+Critical notifications start at 120 minutes by default. Early-arrival and berth-conflict notifications can be switched off independently; underlying operating KPIs remain visible. Map switches control real layers. The terminal name is used in the printable handover report.
 
 ---
 
@@ -166,4 +171,4 @@ Vessel rows now use larger text and fewer badges. Delays appear first by default
 
 Browser checks run before every default-branch Pages deployment, in Chromium at 1440×1000 and 390×844. They exercise filters, empty states and actual downloads. Run `npm ci` followed by `npm run test:e2e`. CI retains the HTML report and failure traces. Mobile here means Chromium emulation, not a physical-device or Safari certification.
 
-[Current refined source release — 24 November 2026](https://github.com/phlppgdfry/vessel-eta-tracker/releases/tag/portfolio-2026-11-24.1). Browser checks also run on pull requests.
+[Current refined source release — 24 November 2026](https://github.com/phlppgdfry/vessel-eta-tracker/releases/latest). Browser checks also run on pull requests.

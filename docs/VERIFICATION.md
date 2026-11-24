@@ -1,3 +1,9 @@
+# Closeout audit — 24 November 2026
+
+Settings now toggle actual Leaflet overlays, respect notification switches, validate threshold ordering, and immediately update list, details, timeline and KPIs. The drawer uses a native dialog with Escape and focus restoration. Terminal text is escaped before printing. Superseded conflicting PR #1 was closed, with its branch preserved.
+
+4 Chromium browser checks passed across 1440×1000 desktop and 390×844 mobile emulation. No uncaught page errors or horizontal page overflow were observed. The full five-project set contains 20 browser checks. Current npm audit: zero known vulnerabilities. Local Markdown links resolve. Browser plugin not available; validation used Playwright. Physical devices, Safari and production terminal/ERP integrations are outside this synthetic portfolio acceptance scope.
+
 # Verification — 24 November 2026
 
 Vessel rows now use larger text and fewer badges. Delays appear first by default; arrival-time sorting remains available. Search, keyboard detail opening and CSV export are covered on desktop and mobile. Leaflet and Chart.js are served from locked dependencies, so their CDNs are not required at runtime.
@@ -51,3 +57,7 @@ screenshots were refreshed from the published demo.
 The exact routes, viewports and interaction checks are recorded in
 [the machine-readable final review](verification/final-review.json).
 The finalized source is preserved by the `portfolio-2026-11-15` release tag.
+
+## External account action
+
+AISStream credential revocation is unverified. The account page requires GitHub sign-in; no existing browser session was available at closeout. The owner must sign in at https://aisstream.io/account and revoke any previously exposed key. Public simulation requires no key. Two pre-existing local drafts remain outside the published artifact and were preserved.

@@ -307,6 +307,7 @@
 body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vname{font-size:14px!important}.vrow{padding:14px!important;min-height:80px}.vmeta{font-size:12px!important}.vmeta-row{gap:10px;margin-top:8px}.vrow-top{gap:8px;flex-wrap:wrap}.vrow-flag,.tag-type,.tag-appr{display:none}.tag-svc,.tag-berth,.etab{font-size:11px!important;padding:3px 6px}.etab{margin-left:auto}.search,#vessel-sort{font-size:13px;min-height:38px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:6px}.search{min-width:160px}.filter-bar{flex-wrap:wrap}.sec-title,.sec-badge,.kpi-sub,.wx-label,.wx-src{font-size:11px}.alert-item{font-size:12px}.t-msg{font-size:12px}.t-ttl{font-size:13px}.kpi-label{font-size:11px!important}.pill{font-size:12px!important;min-height:32px}.e-crit,.e-late{font-weight:700}button:focus-visible,select:focus-visible,[role=button]:focus-visible{outline:2px solid var(--accent-hi);outline-offset:3px}
 @media(max-width:1000px) and (min-width:721px){.main-layout{grid-template-columns:minmax(0,1fr) 440px}}
 @media(max-width:720px){#sidebar{height:auto;overflow:visible}#vessel-list{flex:none;max-height:440px;min-height:300px}#alerts-list{max-height:120px}.main-layout{grid-template-columns:1fr}.vrow{min-height:88px}.search{flex-basis:100%}.filter-bar{flex-wrap:wrap}#vessel-sort{max-width:150px}}
+#settings-panel{margin:0 0 0 auto;padding:0;border:0;border-left:1px solid var(--border);height:100dvh;max-height:100dvh;color:var(--text)}#settings-panel:not([open]){display:none}#settings-panel::backdrop{background:#0008}.sp-sec-title{font-size:11px}.sp-input{font-size:14px}
 </style>
 </head>
 <body>
@@ -340,9 +341,9 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
   <div class="h-right">
     <button class="btn btn-demo" id="demo-btn" onclick="toggleDemo()">▶ Demo</button>
     <div class="h-div"></div>
-    <button class="btn-icon" title="Shift handover report" onclick="printReport()">🖨</button>
-    <button class="btn-icon" title="Export CSV" onclick="doExport()">↓ CSV</button>
-    <button class="btn-icon" title="Settings" onclick="openSettings()">⚙</button>
+    <button class="btn-icon" title="Shift handover report" aria-label="Shift handover report" onclick="printReport()">🖨</button>
+    <button class="btn-icon" title="Export CSV" aria-label="Export CSV" onclick="doExport()">↓ CSV</button>
+    <button class="btn-icon" title="Settings" aria-label="Settings" onclick="openSettings()">⚙</button>
   </div>
 </header>
 
@@ -371,7 +372,7 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
   <div class="kpi">
     <span class="kpi-label">Critical Delays</span>
     <span class="kpi-val cv-red" id="k-crits">0</span>
-    <span class="kpi-sub">&gt;120 min behind</span>
+    <span class="kpi-sub" id="critical-threshold-label">≥120 min behind</span>
   </div>
   <div class="kpi">
     <span class="kpi-label">Approaching</span>
@@ -479,18 +480,18 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
 
 <!-- Settings drawer -->
 <div id="settings-overlay" onclick="closeSettings()"></div>
-<div id="settings-panel">
+<dialog id="settings-panel" aria-labelledby="settings-title" onclose="finishSettingsClose()">
   <div class="sp-hd">
-    <span class="sp-hd-title">Settings</span>
-    <button class="btn-icon" onclick="closeSettings()">✕</button>
+    <span class="sp-hd-title" id="settings-title">Settings</span>
+    <button class="btn-icon" aria-label="Close settings" onclick="closeSettings()">✕</button>
   </div>
   <div class="sp-body">
     <div>
       <div class="sp-sec-title">AIS Connection</div>
       <div style="display:flex;flex-direction:column;gap:.65rem">
         <div class="sp-field">
-          <span class="sp-label">API Key (aisstream.io)</span>
-          <span class="sp-sub">Your key is stored locally in the browser</span>
+          <label class="sp-label" for="sp-apikey">API Key (aisstream.io)</label>
+          <span class="sp-sub">Your key is stored in this browser session only</span>
           <input class="sp-input" id="sp-apikey" type="password" placeholder="Enter API key…"/>
         </div>
         <button class="btn-apply reconnect-btn" onclick="applyApiKey()">⟳ Connect with this key</button>
@@ -500,42 +501,42 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
       <div class="sp-sec-title">Deviation Thresholds</div>
       <div style="display:flex;flex-direction:column;gap:.65rem">
         <div class="sp-field">
-          <span class="sp-label">Warning threshold (min)</span>
+          <label class="sp-label" for="sp-warn">Warning threshold (min)</label>
           <span class="sp-sub">Yellow / orange badge above this deviation</span>
-          <input class="sp-input" id="sp-warn" type="number" value="30" min="5" max="240" style="font-family:var(--font)"/>
+          <input class="sp-input" id="sp-warn" type="number" required value="30" min="5" max="240" style="font-family:var(--font)"/>
         </div>
         <div class="sp-field">
-          <span class="sp-label">Critical threshold (min)</span>
+          <label class="sp-label" for="sp-crit">Critical threshold (min)</label>
           <span class="sp-sub">Trigger alert and toast notification</span>
-          <input class="sp-input" id="sp-crit" type="number" value="120" min="30" max="480" style="font-family:var(--font)"/>
+          <input class="sp-input" id="sp-crit" type="number" required value="120" min="30" max="480" style="font-family:var(--font)"/>
         </div>
       </div>
     </div>
     <div>
       <div class="sp-sec-title">Notifications</div>
       <div>
-        <div class="sp-row"><span class="sp-label">Berth conflict alerts</span><button class="toggle on" id="tog-conf" onclick="this.classList.toggle('on')"></button></div>
-        <div class="sp-row"><span class="sp-label">Early arrival warnings</span><button class="toggle on" id="tog-early" onclick="this.classList.toggle('on')"></button></div>
+        <div class="sp-row"><span class="sp-label">Berth conflict alerts</span><button class="toggle on" id="tog-conf" role="switch" aria-label="Berth conflict alerts" aria-checked="true" onclick="toggleSetting(this)"></button></div>
+        <div class="sp-row"><span class="sp-label">Early arrival warnings</span><button class="toggle on" id="tog-early" role="switch" aria-label="Early arrival warnings" aria-checked="true" onclick="toggleSetting(this)"></button></div>
       </div>
     </div>
     <div>
       <div class="sp-sec-title">Map Display</div>
       <div>
-        <div class="sp-row"><span class="sp-label">Approach lane</span><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-        <div class="sp-row"><span class="sp-label">Pilot station marker</span><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-        <div class="sp-row"><span class="sp-label">Anchorage zone</span><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+        <div class="sp-row"><span class="sp-label">Approach lane</span><button class="toggle on" role="switch" aria-label="Approach lane" aria-checked="true" onclick="toggleMapLayer('approach',this)"></button></div>
+        <div class="sp-row"><span class="sp-label">Pilot station marker</span><button class="toggle on" role="switch" aria-label="Pilot station marker" aria-checked="true" onclick="toggleMapLayer('pilot',this)"></button></div>
+        <div class="sp-row"><span class="sp-label">Anchorage zone</span><button class="toggle on" role="switch" aria-label="Anchorage zone" aria-checked="true" onclick="toggleMapLayer('anchorage',this)"></button></div>
       </div>
     </div>
     <div>
       <div class="sp-sec-title">Terminal</div>
       <div class="sp-field">
-        <span class="sp-label">Terminal name</span>
+        <label class="sp-label" for="sp-term">Terminal name</label>
         <input class="sp-input" id="sp-term" type="text" value="CSP Zeebrugge" style="font-family:var(--font)"/>
       </div>
     </div>
-    <button class="btn-apply" onclick="applySettings()">Apply Settings</button>
+    <p id="settings-error" role="alert" style="color:#f0b490;margin:0"></p><button class="btn-apply" onclick="applySettings()">Apply Settings</button>
   </div>
-</div>
+</dialog>
 
 <!-- Print Report -->
 <div id="print-report">
@@ -708,6 +709,7 @@ let etaHist=[], etaChart=null, map=null;
 let demoMode=false, demoTimer=null, wxTimer=null;
 let curFilter='all', alertLog=[], alerted=new Set(), conflicts=[];
 let approachLine=null;
+const mapOverlays = {};
 let CFG = { warnMin:30, critMin:120 };
 let reconnectTimer=null, reconnectDelay=3000, isConnecting=false;
 let msgCount=0, msgRateVal=0;
@@ -729,17 +731,17 @@ function initMap() {
     iconAnchor:[65,12], className:''
   })}).addTo(map);
 
-  L.marker([PILOT.lat, PILOT.lon],{ icon:L.divIcon({
+  mapOverlays.pilot = L.marker([PILOT.lat, PILOT.lon],{ icon:L.divIcon({
     html:`<div style="background:rgba(28,55,95,.85);color:#c8d8e8;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;white-space:nowrap;border:1px solid rgba(80,130,180,.3)">🚢 Wandelaar Pilot</div>`,
     iconAnchor:[52,10], className:''
   })}).addTo(map);
 
-  L.circle([51.22, 2.95],{ radius:11000, color:'#c48a0a', weight:1, fillOpacity:.03, dashArray:'5,5'})
+  mapOverlays.anchorage = L.circle([51.22, 2.95],{ radius:11000, color:'#c48a0a', weight:1, fillOpacity:.03, dashArray:'5,5'})
     .addTo(map).bindTooltip('Outer Anchorage Area',{className:'vtip'});
 
   L.rectangle(BBOX,{ color:'#1d6fa8', weight:1, fillOpacity:.018, dashArray:'6,5' }).addTo(map);
 
-  L.polyline([[50.85,1.55],[51.05,1.92],[51.18,2.35],[51.28,2.78],[PORT.lat,PORT.lon]],{
+  mapOverlays.approach = L.polyline([[50.85,1.55],[51.05,1.92],[51.18,2.35],[51.28,2.78],[PORT.lat,PORT.lon]],{
     color:'#1d6fa8', weight:1.5, opacity:.16, dashArray:'4,7'
   }).addTo(map);
 }
@@ -818,15 +820,15 @@ function renderTimeline() {
 }
 
 function tlCls(d) {
-  if (d===undefined||d<30) return 'bg-ok';
-  if (d<120) return 'bg-warn';
-  if (d<240) return 'bg-late';
+  if (d===undefined||d<CFG.warnMin) return 'bg-ok';
+  if (d<CFG.critMin) return 'bg-warn';
+  if (d<CFG.critMin*2) return 'bg-late';
   return 'bg-crit';
 }
 function etaTextCol(d) {
-  if (d===undefined||d<30) return '#3fc05a';
-  if (d<120) return '#d4a020';
-  if (d<240) return '#dc7030';
+  if (d===undefined||d<CFG.warnMin) return '#3fc05a';
+  if (d<CFG.critMin) return '#d4a020';
+  if (d<CFG.critMin*2) return '#dc7030';
   return '#d94f3d';
 }
 
@@ -849,6 +851,7 @@ function detectConflicts() {
     ? conflicts.map(c=>c.berth).filter((v,i,a)=>a.indexOf(v)===i).join(', ') + ' overlap'
     : 'ops window overlap';
   document.getElementById('conflict-pill').classList.toggle('on', conflicts.length>0);
+  if (!document.getElementById('tog-conf').classList.contains('on')) return;
   conflicts.forEach(c => {
     const key = `conf_${c.berth}_${[c.v1.mmsi,c.v2.mmsi].sort().join('_')}`;
     if (!alerted.has(key)) {
@@ -1049,7 +1052,7 @@ function resetVessel(v) {
 
 function fireAlert(mmsi) {
   const v=vessels[mmsi];
-  if (!v) return;
+  if (!v || (v.dev < 0 && !document.getElementById('tog-early').classList.contains('on'))) return;
   alerted.add(mmsi);
   const sign=v.dev>0?'+':'';
   const type=Math.abs(v.dev)>=CFG.critMin?'crit':'warn';
@@ -1215,7 +1218,7 @@ function renderDetail(v) {
   if (!v) return;
   const sp=SPECS[v.mmsi]||{};
   const col=etaCol(v.dev), sign=v.dev>0?'+':'';
-  const status=v.dev===undefined?'—':Math.abs(v.dev)<30?'On schedule':v.dev>0?'Running behind':'Running ahead';
+  const status=v.dev===undefined?'—':Math.abs(v.dev)<CFG.warnMin?'On schedule':v.dev>0?'Running behind':'Running ahead';
   const conf=conflicts.find(c=>c.v1.mmsi===v.mmsi||c.v2.mmsi===v.mmsi);
   const impactHtml=conf
     ? `<div class="impact-row">⚠ Berth ${conf.berth} — ops window conflict with ${(conf.v1.mmsi===v.mmsi?conf.v2:conf.v1).name}</div>`
@@ -1235,7 +1238,7 @@ function renderDetail(v) {
           `MMSI: ${v.mmsi}`
         }</div>
       </div>
-      <button class="dclose" onclick="closeDetail()">✕</button>
+      <button class="dclose" aria-label="Close vessel details" onclick="closeDetail()">✕</button>
     </div>
     <div class="dgrid">
       ${v.svc?`<div class="dfield"><span class="df-label">Service</span><span class="df-val" style="color:#5aabdb">${v.svc}</span></div>`:''}
@@ -1322,10 +1325,10 @@ function renderList() {
     const d=v.dev;
     let bc='',bt='';
     if(d!==undefined){
-      if(d<-30)       {bc='e-early';bt='Early '+Math.abs(d)+'m';}
-      else if(d<30)   {bc='e-ok';   bt=d===0?'On Time':(d>0?'+':'')+d+'m';}
-      else if(d<120)  {bc='e-warn'; bt='Late +'+d+'m';}
-      else if(d<240)  {bc='e-late'; bt='Late +'+d+'m';}
+      if(d<=-CFG.warnMin)       {bc='e-early';bt='Early '+Math.abs(d)+'m';}
+      else if(d<CFG.warnMin)   {bc='e-ok';   bt=d===0?'On Time':(d>0?'+':'')+d+'m';}
+      else if(d<CFG.critMin)  {bc='e-warn'; bt='Late +'+d+'m';}
+      else if(d<CFG.critMin*2)  {bc='e-late'; bt='Late +'+d+'m';}
       else            {bc='e-crit'; bt='Late +'+d+'m';}
     }
     const stale=v.lastSeen&&(Date.now()-v.lastSeen)>300000;
@@ -1365,7 +1368,7 @@ function updateKPIs() {
   const all   = Object.values(vessels).filter(v=>v.lat);
   const sched = all.filter(v=>v.dev!==undefined);
   const onT   = sched.filter(v=>Math.abs(v.dev)<CFG.warnMin);
-  const crits = sched.filter(v=>v.dev>CFG.critMin);
+  const crits = sched.filter(v=>v.dev>=CFG.critMin);
   const avg   = sched.length ? Math.round(sched.reduce((s,v)=>s+v.dev,0)/sched.length) : null;
 
   const kotEl=document.getElementById('k-ontime');
@@ -1379,10 +1382,11 @@ function updateKPIs() {
   const kavEl=document.getElementById('k-avgdev');
   if (avg!==null) {
     kavEl.textContent=(avg>0?'+':'')+avg+'m';
-    kavEl.className='kpi-val '+(Math.abs(avg)<30?'cv-green':Math.abs(avg)<120?'cv-yellow':'cv-red');
+    kavEl.className='kpi-val '+(Math.abs(avg)<CFG.warnMin?'cv-green':Math.abs(avg)<CFG.critMin?'cv-yellow':'cv-red');
   } else { kavEl.textContent='—'; kavEl.className='kpi-val cv-muted'; }
 
   document.getElementById('k-crits').textContent=crits.length;
+  document.getElementById('critical-threshold-label').textContent='≥'+CFG.critMin+' min behind';
 
   const appr = all.filter(v=>v.distKm!=null && v.distKm<25);
   document.getElementById('k-appr').textContent = appr.length;
@@ -1452,7 +1456,7 @@ function updateChart() {
   if (!etaChart||!etaHist.length) return;
   etaChart.data.labels = etaHist.map(p=>fmtTimeSec(p.t));
   etaChart.data.datasets[0].data = etaHist.map(p=>p.dev);
-  etaChart.data.datasets[0].pointBackgroundColor = etaHist.map(p=>Math.abs(p.dev)<30?'#27a448':Math.abs(p.dev)<120?'#c48a0a':'#b83232');
+  etaChart.data.datasets[0].pointBackgroundColor = etaHist.map(p=>Math.abs(p.dev)<CFG.warnMin?'#27a448':Math.abs(p.dev)<CFG.critMin?'#c48a0a':'#b83232');
   etaChart.update('none');
 }
 
@@ -1481,22 +1485,42 @@ function toast(type, title, msg, ms=6500) {
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
+function toggleSetting(button) {
+  const enabled = button.classList.toggle('on');
+  button.setAttribute('aria-checked', String(enabled));
+  return enabled;
+}
+function toggleMapLayer(key, button) {
+  const enabled = toggleSetting(button);
+  const layer = mapOverlays[key];
+  if (enabled) map.addLayer(layer); else map.removeLayer(layer);
+}
 function openSettings() {
   document.getElementById('sp-apikey').value = getApiKey();
-  document.getElementById('settings-panel').classList.add('on');
-  document.getElementById('settings-overlay').classList.add('on');
+  document.getElementById('settings-error').textContent = '';
+  const panel = document.getElementById('settings-panel');
+  panel.showModal(); panel.classList.add('on');
 }
-function closeSettings() {
+function finishSettingsClose() {
   document.getElementById('settings-panel').classList.remove('on');
   document.getElementById('settings-overlay').classList.remove('on');
 }
+function closeSettings() { document.getElementById('settings-panel').close(); }
 function applySettings() {
-  CFG.warnMin=parseInt(document.getElementById('sp-warn').value)||30;
-  CFG.critMin=parseInt(document.getElementById('sp-crit').value)||120;
+  const warning = document.getElementById('sp-warn');
+  const critical = document.getElementById('sp-crit');
+  if (!warning.reportValidity() || !critical.reportValidity()) return;
+  if (Number(critical.value) <= Number(warning.value)) {
+    document.getElementById('settings-error').textContent = 'Critical threshold must be greater than warning threshold.';
+    critical.focus(); return;
+  }
+  CFG.warnMin=Number(warning.value); CFG.critMin=Number(critical.value);
   alerted.clear(); conflicts=[];
   Object.values(vessels).forEach(v=>{ if(v.dev!==undefined&&Math.abs(v.dev)>=CFG.critMin) fireAlert(v.mmsi); });
+  detectConflicts(); renderList(); renderTimeline(); updateKPIs(); updateChart();
+  if (selectedMmsi) selectVessel(selectedMmsi);
   closeSettings();
-  toast('ok','Settings applied','Warning >'+CFG.warnMin+' min · Critical >'+CFG.critMin+' min');
+  toast('ok','Settings applied','Warning ≥'+CFG.warnMin+' min · Critical ≥'+CFG.critMin+' min');
 }
 
 // ─── Overlay helpers ──────────────────────────────────────────────────────────
@@ -1517,7 +1541,7 @@ function hideConnOverlay() {
 function printReport() {
   const now=new Date();
   const hr=now.getHours();
-  const term=document.getElementById('sp-term').value||'CSP Zeebrugge';
+  const term=String(document.getElementById('sp-term').value||'CSP Zeebrugge').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const shift=hr>=6&&hr<14?'Early Shift  06:00–14:00':hr>=14&&hr<22?'Late Shift  14:00–22:00':'Night Shift  22:00–06:00';
   document.getElementById('pr-meta').innerHTML=
     `Terminal: ${term}<br>Date: ${now.toLocaleDateString('nl-BE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}<br>Shift: ${shift}<br>Printed: ${now.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'})}`;
@@ -1525,7 +1549,7 @@ function printReport() {
   const rows=Object.values(vessels).filter(v=>v.lat).sort((a,b)=>(a.distKm||999)-(b.distKm||999));
   document.getElementById('pr-tbody').innerHTML=rows.map(v=>{
     const d=v.dev;
-    const status=d===undefined?'—':Math.abs(d)<30?'On Time':d>0?`+${d} min late`:`${Math.abs(d)} min early`;
+    const status=d===undefined?'—':Math.abs(d)<CFG.warnMin?'On Time':d>0?`+${d} min late`:`${Math.abs(d)} min early`;
     return `<tr><td>${v.name||v.mmsi}</td><td>${v.svc||'—'}</td><td>${v.voy||'—'}</td><td>${v.berth||'TBC'}</td><td>${v.schedEta?fmtTime(v.schedEta):'—'}</td><td>${v.calcEta?fmtTime(v.calcEta):'—'}</td><td>${d!==undefined?(d>0?'+':'')+d+' min':'—'}</td><td>${status}</td></tr>`;
   }).join('');
   document.getElementById('pr-alerts-body').innerHTML=alertLog.length
@@ -1623,7 +1647,7 @@ function updateLabel(mmsi) {
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function hav(la1,lo1,la2,lo2){const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180,a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
 function bearing(la1,lo1,la2,lo2){const d=(lo2-lo1)*Math.PI/180,a=la1*Math.PI/180,b=la2*Math.PI/180;return((Math.atan2(Math.sin(d)*Math.cos(b),Math.cos(a)*Math.sin(b)-Math.sin(a)*Math.cos(b)*Math.cos(d))*180/Math.PI)+360)%360;}
-function etaCol(d){if(d===undefined)return'#4f6d88';if(d<30)return'#27a448';if(d<120)return'#c48a0a';if(d<240)return'#c95c1a';return'#b83232';}
+function etaCol(d){if(d===undefined)return'#4f6d88';if(d<CFG.warnMin)return'#27a448';if(d<CFG.critMin)return'#c48a0a';if(d<CFG.critMin*2)return'#c95c1a';return'#b83232';}
 function fmtTime(d){return d?.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'})||'—';}
 function fmtTimeSec(d){return d?.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit',second:'2-digit'})||'—';}
 
