@@ -408,7 +408,8 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
     <div class="conflict-pill" id="conflict-pill">⚠ Berth conflict detected</div>
     <div class="connecting-overlay" id="conn-overlay">
       <div class="co-ring"></div>
-      <div class="co-label" id="conn-overlay-label">Connecting to AIS stream…</div>
+      <div class="co-label" id="conn-overlay-label" role="status">Connecting to AIS stream…</div>
+      <button class="btn btn-demo" onclick="startDemo()">Open simulation</button>
     </div>
   </div>
 
@@ -575,7 +576,8 @@ body{font-size:14px}.main-layout{grid-template-columns:minmax(0,1fr) 490px}.vnam
 // ─── Config ───────────────────────────────────────────────────────────────────
 // Public live credentials exist only on the relay server. Local overrides use session storage.
 const DEFAULT_API_KEY = '';
-const LIVE_WS_URL = 'wss://vessel-eta-live.vercel.app/api/live';
+const LIVE_API_URL = 'https://vessel-eta-live.vercel.app/api/live';
+let liveAbort = null, snapshotTime = null;
 let publicLive = false, lastAisReceived = null;
 let suppressToasts = false;
 const LS_KEY = 'vesseleta_apikey';
@@ -585,7 +587,7 @@ function getApiKey() {
 }
 
 function getWsUrl() {
-  return publicLive ? LIVE_WS_URL : `ws://${location.host}/ais`;
+  return `ws://${location.host}/ais`;
 }
 
 function buildSubscription(key) {
@@ -864,6 +866,7 @@ function detectConflicts() {
 
 // ─── Connection ───────────────────────────────────────────────────────────────
 function autoConnect(key) {
+  if (publicLive) { pollLive(); return; }
   if (ws && ws.readyState===WebSocket.OPEN) return;
   if (demoMode) return;
   if (isConnecting) return;
@@ -931,6 +934,42 @@ function autoConnect(key) {
   };
 }
 
+async function pollLive() {
+  if (demoMode || !publicLive || isConnecting) return;
+  clearTimeout(reconnectTimer);
+  isConnecting = true;
+  const controller = new AbortController();
+  liveAbort = controller;
+  const timeout = setTimeout(() => controller.abort(), 42000);
+  if (!lastAisReceived) { setStatus('conn','Loading live AIS…'); showConnOverlay('Collecting real AIS positions…'); }
+  try {
+    const response = await fetch(LIVE_API_URL, { signal:controller.signal, credentials:'omit' });
+    if (!response.ok) throw new Error('AIS unavailable');
+    const data = await response.json();
+    if (controller !== liveAbort || demoMode || !publicLive) return;
+    if (!Array.isArray(data.messages) || !data.messages.length || !Number.isFinite(Date.parse(data.collectedAt)) || Date.now()-Date.parse(data.collectedAt)>90000) throw new Error('No recent AIS');
+    if (snapshotTime !== data.collectedAt) {
+      data.messages.forEach(onAIS);
+      snapshotTime = data.collectedAt;
+    }
+    setStatus('live','Live AIS · 30s snapshots');
+    hideConnOverlay();
+    document.getElementById('reconnect-btn').style.display='';
+    reconnectDelay = 3000;
+    reconnectTimer = setTimeout(pollLive, 30000);
+  } catch {
+    if (controller !== liveAbort || demoMode || !publicLive) return;
+    setStatus('err','AIS unavailable · retrying');
+    document.getElementById('reconnect-btn').style.display='';
+    if (!lastAisReceived) showConnOverlay('AIS provider unavailable. Retrying automatically; Demo remains available.');
+    reconnectDelay = Math.min(reconnectDelay * 1.6, 45000);
+    reconnectTimer = setTimeout(pollLive, reconnectDelay);
+  } finally {
+    clearTimeout(timeout);
+    if (controller === liveAbort) isConnecting = false;
+  }
+}
+
 function scheduleReconnect() {
   if (demoMode) return;
   clearTimeout(reconnectTimer);
@@ -941,7 +980,7 @@ function scheduleReconnect() {
 }
 
 function doReconnect() {
-  if (demoMode) { startLive(); return; }
+  if (demoMode || publicLive) { startLive(); return; }
   if (ws) { try { ws.close(); } catch(_){} ws = null; }
   reconnectDelay = 3000;
   isConnecting = false;
@@ -1008,6 +1047,8 @@ function startDemo() {
 }
 
 function resetFeed() {
+  if (liveAbort) { liveAbort.abort(); liveAbort = null; }
+  snapshotTime = null;
   clearInterval(demoTimer); demoTimer=null;
   clearTimeout(reconnectTimer);
   if (ws) { const old = ws; ws = null; old.onclose = null; old.onerror = null; old.onmessage = null; clearTimeout(old._hideTimer); old.close(); }
@@ -1116,26 +1157,26 @@ function onAIS(msg) {
   const lat=msg.MetaData?.latitude, lon=msg.MetaData?.longitude;
   if (!/^\d{9}$/.test(mmsi) || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat)>90 || Math.abs(lon)>180) return;
 
-  lastAisReceived = new Date();
+  lastAisReceived = new Date(Number.isFinite(msg.ReceivedAt) ? msg.ReceivedAt : Date.now());
   reconnectDelay = 3000;
   setStatus('live', 'Live AIS · aisstream.io');
   const mt = msg.MessageType;
   if (mt==='PositionReport') {
     const p=msg.Message?.PositionReport;
-    applyVessel(mmsi,{name,lat,lon,sog:p?.Sog||0,cog:p?.Cog??null,lastSeen:new Date()});
+    applyVessel(mmsi,{name,lat,lon,sog:p?.Sog||0,cog:p?.Cog??null,lastSeen:lastAisReceived});
   } else if (mt==='StandardClassBPositionReport') {
     const p=msg.Message?.StandardClassBPositionReport;
-    applyVessel(mmsi,{name,lat,lon,sog:p?.Sog||0,cog:p?.Cog??null,lastSeen:new Date()});
+    applyVessel(mmsi,{name,lat,lon,sog:p?.Sog||0,cog:p?.Cog??null,lastSeen:lastAisReceived});
   } else if (mt==='ExtendedClassBPositionReport') {
     const p=msg.Message?.ExtendedClassBPositionReport;
-    applyVessel(mmsi,{name:cleanAisLabel(p?.Name)||name,lat,lon,sog:p?.Sog||0,cog:p?.Cog??null,lastSeen:new Date()});
+    applyVessel(mmsi,{name:cleanAisLabel(p?.Name)||name,lat,lon,sog:p?.Sog||0,cog:p?.Cog??null,lastSeen:lastAisReceived});
   } else if (mt==='ShipStaticData') {
     const sd=msg.Message?.ShipStaticData;
     applyVessel(mmsi,{name:cleanAisLabel(sd?.Name)||name,dest:cleanAisLabel(sd?.Destination),
-      shipType:sd?.Type,lat,lon,lastSeen:new Date()});
+      shipType:sd?.Type,lat,lon,lastSeen:lastAisReceived});
   } else if (lat && lon) {
     // Catch-all for other message types that have position data
-    applyVessel(mmsi,{name,lat,lon,lastSeen:new Date()});
+    applyVessel(mmsi,{name,lat,lon,lastSeen:lastAisReceived});
   }
 }
 
@@ -1275,7 +1316,7 @@ function renderDetail(v) {
       </div>
       <button class="dclose" aria-label="Close vessel details" onclick="closeDetail()">✕</button>
     </div>
-    <p style="font-size:12px;color:var(--muted)">${demoMode ? 'Simulated positions and operational planning.' : 'Live AIS positions. ETA is a straight-line speed estimate, not a confirmed port call. No operational schedule connected.'}</p>
+    <p style="font-size:12px;color:var(--muted)">${demoMode ? 'Simulated positions and operational planning.' : 'AIS snapshots refresh every 30 seconds. ETA is a straight-line speed estimate, not a confirmed port call. No operational schedule connected.'}</p>
     <div class="dgrid">
       ${v.svc?`<div class="dfield"><span class="df-label">Service</span><span class="df-val" style="color:#5aabdb">${v.svc}</span></div>`:''}
       ${v.berth?`<div class="dfield"><span class="df-label">Berth</span><span class="df-val" style="color:#a07fe0">${v.berth}</span></div>`:''}
@@ -1348,13 +1389,13 @@ function renderList() {
   const el=document.getElementById('vessel-list');
   if (!rows.length) {
     const all = Object.keys(vessels).length;
-    const connected = ws && ws.readyState===WebSocket.OPEN;
+    const connected = publicLive ? lastAisReceived && Date.now()-lastAisReceived.getTime()<90000 : ws && ws.readyState===WebSocket.OPEN;
     el.innerHTML=`<div class="placeholder"><div class="ph-ico">🚢</div>
       <div class="ph-ttl">${all?'No matches':'No vessels yet'}</div>
       <div class="ph-sub">${all?'Try a different filter':
         demoMode?'Loading demo…':
         connected?'Connected — vessels appear when they broadcast AIS in the monitoring zone':
-        'Demo paused. Start Demo or configure a local AIS connection in Settings.'}</div></div>`;
+        publicLive?'Waiting for a recent AIS snapshot. Automatic retry is active; Open simulation to explore the planning scenario.':'Start Demo or configure a local AIS connection in Settings.'}</div></div>`;
     return;
   }
   el.innerHTML=rows.map(v=>{

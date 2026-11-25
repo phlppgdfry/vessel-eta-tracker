@@ -1,89 +1,76 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
 const { once } = require('node:events');
-const { WebSocket, WebSocketServer } = require('ws');
-const { createPublicServer, publicMessage } = require('./public-server.cjs');
-const ORIGIN = 'https://phlppgdfry.github.io';
-const FIXTURE = { MessageType: 'PositionReport', MetaData: { MMSI: 477307900,
-  ShipName: '<img> LIVE VESSEL', latitude: 51.5, longitude: 2.9, secret: 'private' },
-  Message: { PositionReport: { Sog: 12, Cog: 120, private: 'private' } }, APIKey: 'private' };
-async function fixture(t, options = {}) {
-  const provider = new WebSocketServer({ port: 0, host: '127.0.0.1' });
-  await once(provider, 'listening');
-  const server = createPublicServer({ key: 'test-server-secret',
-    upstreamUrl: `ws://127.0.0.1:${provider.address().port}`, ...options });
-  server.listen(0, '127.0.0.1'); await once(server, 'listening');
-  t.after(() => { server.shutdown(); provider.clients.forEach(c => c.terminate()); provider.close(); });
-  const url = `ws://127.0.0.1:${server.address().port}/api/live`;
-  return { provider, server, url, connect: () => new WebSocket(url, { origin: ORIGIN }) };
+const { WebSocketServer } = require('ws');
+const { createSnapshotHandler } = require('./snapshot.cjs');
+const { publicMessage } = require('./public-server.cjs');
+const FIXTURE = { MessageType:'PositionReport', MetaData:{MMSI:477307900,
+  ShipName:'<img> LIVE VESSEL',latitude:51.5,longitude:2.9,secret:'private'},
+  Message:{PositionReport:{Sog:12,Cog:120,private:'private'}},APIKey:'private' };
+async function fixture(t, options={}) {
+  const provider = new WebSocketServer({port:0,host:'127.0.0.1'});
+  await once(provider,'listening');
+  const handler = createSnapshotHandler({key:'test-server-secret',
+    url:`ws://127.0.0.1:${provider.address().port}`,collectMs:40,handshakeMs:1000,...options});
+  const server = http.createServer(handler);
+  server.listen(0,'127.0.0.1'); await once(server,'listening');
+  t.after(()=>{server.closeAllConnections();server.close();provider.clients.forEach(c=>c.terminate());provider.close();});
+  return {provider,url:`http://127.0.0.1:${server.address().port}/api/live`};
 }
-const nextAIS = socket => new Promise((resolve, reject) => {
-  const timeout = setTimeout(() => reject(new Error('No AIS')), 2000);
-  socket.on('message', raw => { const msg = JSON.parse(String(raw)); if (msg.MessageType) { clearTimeout(timeout); resolve(msg); } });
+test('missing credentials fail explicitly and are never requested from visitors', async t=>{
+  const {url}=await fixture(t,{key:''});
+  const r=await fetch(url);assert.equal(r.status,503);
+  assert.deepEqual(await r.json(),{source:'AISStream',error:'not_configured'});
+  assert.equal(r.headers.get('cache-control'),'no-store');
 });
-test('public health reports a missing credential without exposing configuration', async t => {
-  const { url } = await fixture(t, { key: '' });
-  const response = await fetch(url.replace('ws:', 'http:'));
-  assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), { source: 'AISStream', configured: false, mode: 'live', operationalSchedule: false });
-});
-test('rejects unrelated origins before creating an upstream connection', async t => {
-  const { url, provider } = await fixture(t);
-  let connections = 0; provider.on('connection', () => connections++);
-  const socket = new WebSocket(url, { origin: 'https://other.test' });
-  const [error] = await once(socket, 'error');
-  assert.match(error.message, /403/); assert.equal(connections, 0);
-});
-test('shares a server-owned subscription and sends only validated public fields', async t => {
-  const { connect, provider } = await fixture(t);
-  const upstreamPromise = once(provider, 'connection');
-  const first = connect(); const data1 = nextAIS(first);
-  const [upstream] = await upstreamPromise;
-  const [rawSubscription] = await once(upstream, 'message');
-  const subscription = JSON.parse(String(rawSubscription));
-  assert.equal(subscription.APIKey, 'test-server-secret');
-  assert.deepEqual(subscription.BoundingBoxes, [[[50.8, 1.5], [52.2, 4.8]]]);
-  const second = connect(); const data2 = nextAIS(second); await once(second, 'open');
-  assert.equal(provider.clients.size, 1);
-  upstream.send(JSON.stringify(FIXTURE));
-  const messages = await Promise.all([data1, data2]);
-  for (const msg of messages) {
-    assert.equal(msg.MetaData.MMSI, 477307900);
-    assert.ok(!JSON.stringify(msg).includes('private'));
-    assert.ok(!JSON.stringify(msg).includes('test-server-secret'));
-    assert.ok(!msg.MetaData.ShipName.includes('<'));
+test('shares collection across concurrent requests and caches only validated public data',async t=>{
+  const {url,provider}=await fixture(t);let connections=0;
+  provider.on('connection',socket=>{connections++;socket.on('message',raw=>{
+    const sub=JSON.parse(String(raw));assert.equal(sub.APIKey,'test-server-secret');
+    assert.deepEqual(sub.BoundingBoxes,[[[50.8,1.5],[52.2,4.8]]]);
+    socket.send(JSON.stringify(FIXTURE));
+  });});
+  const results=await Promise.all([fetch(url),fetch(url)]);
+  for(const r of results){assert.equal(r.status,200);assert.equal(r.headers.get('access-control-allow-origin'),'*');
+    const body=await r.json();assert.equal(body.mode,'live');assert.equal(body.operationalSchedule,false);
+    assert.equal(body.messages.length,1);assert.equal(body.messages[0].MetaData.MMSI,477307900);
+    assert.ok(!JSON.stringify(body).includes('private'));assert.ok(!JSON.stringify(body).includes('test-server-secret'));
+    assert.ok(!body.messages[0].MetaData.ShipName.includes('<'));
   }
+  await fetch(url);assert.equal(connections,1);
+  await new Promise(resolve=>setTimeout(resolve,30));assert.equal(provider.clients.size,0,'upstream must be closed before the response completes');
 });
-test('client writes cannot change the provider subscription', async t => {
-  const { connect, provider } = await fixture(t);
-  const feedPromise = once(provider, 'connection');
-  const socket = connect(); await once(socket, 'open');
-  const [upstream] = await feedPromise;
-  const closed = once(socket, 'close'); socket.send('{"APIKey":"attacker"}');
-  const [code] = await closed; assert.equal(code, 1008);
-  assert.ok(upstream.readyState !== WebSocket.OPEN || provider.clients.size <= 1);
+test('client submissions never create or alter a provider subscription',async t=>{
+  const {url,provider}=await fixture(t);let connections=0;provider.on('connection',()=>connections++);
+  const r=await fetch(url,{method:'POST',body:'{"APIKey":"attacker"}'});
+  assert.equal(r.status,405);assert.equal(connections,0);
 });
-test('provider errors close visitors without echoing secrets', async t => {
-  const { connect, provider } = await fixture(t);
-  const feedPromise = once(provider, 'connection');
-  const socket = connect(); const messages = [];
-  socket.on('message', raw => messages.push(String(raw)));
-  const [upstream] = await feedPromise; await once(upstream, 'message');
-  const closed = once(socket, 'close');
-  upstream.send(JSON.stringify({ error: 'invalid test-server-secret' }));
-  const [code] = await closed; assert.equal(code, 1013);
-  assert.ok(messages.some(msg => msg.includes('unavailable')));
-  assert.ok(!messages.join('').includes('test-server-secret'));
+test('provider errors return a fixed reason, never the raw error or secret',async t=>{
+  const {url,provider}=await fixture(t);
+  provider.on('connection',socket=>socket.on('message',()=>socket.send('{"error":"invalid test-server-secret"}')));
+  const r=await fetch(url);assert.equal(r.status,503);const data=await r.json();
+  assert.equal(data.reason,'provider_rejected');assert.ok(!JSON.stringify(data).includes('test-server-secret'));
 });
-test('sessions expire within the function lifetime', async t => {
-  const { connect } = await fixture(t, { sessionMs: 50 });
-  const socket = connect(); const [code] = await once(socket, 'close'); assert.equal(code, 1001);
+test('an empty feed times out, closes upstream and never substitutes demo ships',async t=>{
+  const {url,provider}=await fixture(t,{collectMs:20});
+  const r=await fetch(url);assert.equal(r.status,503);
+  assert.equal((await r.json()).reason,'no_data');
+  await new Promise(resolve=>setTimeout(resolve,30));assert.equal(provider.clients.size,0);
 });
-test('invalid positions, provider payloads and AIS unavailable values are filtered', () => {
-  assert.equal(publicMessage(JSON.stringify({ error: 'private' })), null);
-  assert.equal(publicMessage(JSON.stringify({ ...FIXTURE, MetaData: { ...FIXTURE.MetaData, latitude: 91 } })), null);
-  assert.equal(publicMessage(JSON.stringify({ ...FIXTURE, MetaData: { ...FIXTURE.MetaData, MMSI: 'x' } })), null);
-  const result = publicMessage(JSON.stringify({ ...FIXTURE, Message: { PositionReport: { Sog: 102.3, Cog: 360 } } }));
-  assert.equal(result.Message.PositionReport.Sog, 0);
-  assert.equal(result.Message.PositionReport.Cog, null);
+test('cached snapshots expire and require a new real collection',async t=>{
+  const {url,provider}=await fixture(t,{cacheMs:1,collectMs:10});let connections=0;
+  provider.on('connection',socket=>{connections++;socket.on('message',()=>socket.send(JSON.stringify(FIXTURE)));});
+  assert.equal((await fetch(url)).status,200);
+  await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal((await fetch(url)).status,200);assert.equal(connections,2);
+});
+test('invalid MMSI, out-of-area positions and AIS unavailable values are filtered',()=>{
+  assert.equal(publicMessage(JSON.stringify({error:'private'})),null);
+  assert.equal(publicMessage(JSON.stringify({...FIXTURE,MetaData:{...FIXTURE.MetaData,latitude:91}})),null);
+  assert.equal(publicMessage(JSON.stringify({...FIXTURE,MetaData:{...FIXTURE.MetaData,MMSI:'x'}})),null);
+  const current = publicMessage(JSON.stringify({...FIXTURE,MetaData:{MMSI:477307900,ShipName:'CURRENT',Latitude:51.5,Longitude:2.9}}));
+  assert.equal(current.MetaData.latitude,51.5);assert.equal(current.MetaData.longitude,2.9);
+  const msg=publicMessage(JSON.stringify({...FIXTURE,Message:{PositionReport:{Sog:102.3,Cog:360}}}));
+  assert.equal(msg.Message.PositionReport.Sog,0);assert.equal(msg.Message.PositionReport.Cog,null);
 });

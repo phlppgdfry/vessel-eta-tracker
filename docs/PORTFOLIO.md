@@ -1,6 +1,6 @@
 # VesselETA portfolio walkthrough
 
-1. Open the public dashboard: it connects to live AIS through a server-side relay.
+1. Open the public dashboard: it loads live AIS snapshots through a server-side relay every 30 seconds.
 2. Search a vessel and select its row to inspect speed, destination and approach.
 3. Read the feed status and last-message age. Estimated ETA is distance/speed;
    no operational schedule, confirmed arrival or berth assignment is implied.

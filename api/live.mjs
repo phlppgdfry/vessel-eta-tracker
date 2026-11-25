@@ -1,2 +1,2 @@
-import relay from '../live/public-server.cjs';
-export default relay.createPublicServer();
+import snapshots from '../live/snapshot.cjs';
+export default snapshots.createSnapshotHandler();

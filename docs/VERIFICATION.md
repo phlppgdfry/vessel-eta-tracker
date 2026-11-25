@@ -60,7 +60,7 @@ The finalized source is preserved by the `portfolio-2026-11-15` release tag.
 
 ## External account action — resolved
 
-Resolved on 24 November 2026: after the owner authenticated, the previously exposed AISStream credential was matched to the historical repository credential without displaying its value. It was disabled in the authenticated provider account; the UI confirmed Disabled and offered Re-enable. A replacement credential was subsequently created by the owner and saved as a secret Production variable in the separate Vercel relay project. The value was not read into source or chat. Public live AIS was verified through the deployed relay; simulation remains a separate explicit mode. Two pre-existing local drafts remain outside the published artifact and were preserved.
+Resolved on 24 November 2026: after the owner authenticated, the previously exposed AISStream credential was matched to the historical repository credential without displaying its value. It was disabled in the authenticated provider account; the UI confirmed Disabled and offered Re-enable. A replacement credential was subsequently created by the owner and saved as a secret Production variable in the separate Vercel relay project. The value was not read into source or chat. Live AIS reception was verified through the initial deployed relay on 24 November; simulation remains a separate explicit mode. Two pre-existing local drafts remain outside the published artifact and were preserved.
 
 
 ## Secure public live AIS — 24 November 2026
@@ -68,7 +68,7 @@ Resolved on 24 November 2026: after the owner authenticated, the previously expo
 The owner saved `AISSTREAM_API_KEY` as a Secret for Production in
 `kippiegs-projects/vessel-eta-live`. The authenticated Vercel UI and CLI confirmed
 the variable exists; its value was not requested or logged. After redeployment,
-the public WebSocket delivered actual AIS positions and Chromium displayed
+the public backend delivered actual AIS positions and Chromium displayed
 ANDREA, MULTRATUG 3 and EVER ECHO in live mode with no synthetic schedule.
 
 Nine Node checks cover local file isolation and the relay; eight browser checks
@@ -80,3 +80,32 @@ continuous provider coverage or unlimited concurrent connections.
 Live mode intentionally leaves schedule, deviation, critical delays and berth
 conflict KPIs unavailable. Reports and exports identify their data source. The
 previous screenshot pair shows the simulation; new live captures are separate.
+
+### Connection lifecycle follow-up
+
+New persistent upstream connections intermittently failed during their opening
+handshake. The final implementation uses bounded snapshot collection and closes
+the provider socket before returning each HTTP response. Successful snapshots
+are cached for 30 seconds; the UI shows their age and uses an explicit error
+state when no recent data is available. The Node function runs in `iad1`.
+The secret remains in the same Production project. Tests verify socket cleanup,
+shared collection, cache expiry and separation from simulated planning.
+
+
+## Latest external reception check — 25 November 2026
+
+The snapshot endpoint returned HTTP 503 with `handshake_timeout`. An independent
+WebSocket opening attempt from the local computer also timed out without
+sending any key, and an HTTPS request to the official stream endpoint received
+no response within 15 seconds. This failure occurs before subscription or key
+validation. It is an external reachability limitation at the time of this check;
+it does not establish a service-wide outage or a rejected replacement key.
+
+The new credential remains configured in Vercel Production. Earlier successful
+live reception and the 24 November live screenshots are historical evidence;
+continuous live availability is **not** claimed. The site reports unavailability
+and retries automatically, and its explicit simulation remains usable.
+The final snapshot implementation has been verified against a local test provider;
+real snapshot reception is still pending upstream reachability.
+
+[Machine-readable current status](verification/live-ais-2026-11-25.json).

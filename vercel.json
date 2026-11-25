@@ -3,6 +3,6 @@
   "framework": null,
   "buildCommand": "npm run build",
   "outputDirectory": "site",
-  "regions": ["cdg1"],
-  "functions": { "api/live.mjs": { "maxDuration": 300 } }
+  "regions": ["iad1"],
+  "functions": { "api/live.mjs": { "maxDuration": 45 } }
 }

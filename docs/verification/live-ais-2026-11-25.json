@@ -1,0 +1,47 @@
+{
+  "checkedAt": "2026-11-25T00:22:00Z",
+  "credential": {
+    "oldKey": "disabled",
+    "replacement": "stored as Secret, Production in kippiegs-projects/vessel-eta-live",
+    "secretValueReadByAgent": false
+  },
+  "implementation": {
+    "publicEndpoint": "https://vessel-eta-live.vercel.app/api/live",
+    "mode": "bounded live AIS snapshots",
+    "refreshSeconds": 30,
+    "upstreamCollectionSeconds": 7,
+    "upstreamHandshakeTimeoutSeconds": 25,
+    "region": "iad1",
+    "socketClosedBeforeResponse": true,
+    "operationalScheduleConnected": false
+  },
+  "latestExternalCheck": {
+    "status": "upstream_unreachable",
+    "httpStatus": 503,
+    "reason": "handshake_timeout",
+    "independentLocalWebSocket": "opening timed out without sending any credential",
+    "independentHTTPS": "15-second timeout with zero response bytes",
+    "interpretation": "Failure precedes authentication; global provider outage is not established."
+  },
+  "earlierEvidence": {
+    "date": "2026-11-24",
+    "liveWebSocketReception": "passed; actual AIS vessels displayed",
+    "scope": "Historical evidence of the replacement key working; not proof that current snapshot reception is available."
+  },
+  "verification": {
+    "nodeChecks": 9,
+    "browserChecks": 8,
+    "browserViewports": [
+      [
+        1440,
+        1000
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "liveSnapshotReception": "pending external reachability"
+  },
+  "remainingWork": "Confirm recent real snapshots after the official stream endpoint becomes reachable. No additional user key entry is currently required."
+}

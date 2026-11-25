@@ -4,10 +4,14 @@
 
 **[Open live AIS](https://phlppgdfry.github.io/vessel-eta-tracker/)** · **[Open simulation](https://phlppgdfry.github.io/vessel-eta-tracker/?mode=demo)** · [Walkthrough](docs/PORTFOLIO.md) · [Verification](docs/VERIFICATION.md)
 
-Live positions around Zeebrugge arrive through a server-side AISStream relay.
-Visitors need no key. The optional simulation demonstrates arrival deviations,
+Live AIS snapshots around Zeebrugge refresh every 30 seconds through a server-side relay.
+Visitors need no key. At the latest 25 November check, the upstream stream
+connection timed out before authentication; the UI reports that state and retries.
+See [current verification](docs/VERIFICATION.md) for the remaining external limitation. The optional simulation demonstrates arrival deviations,
 berth conflicts and handover planning with eight clearly labelled sample vessels.
 This is an independent portfolio project, not an endorsed CSP system.
+
+Live reception captured on 24 November 2026:
 
 ![Actual live AIS dashboard](docs/screenshots/live-desktop.png)
 
@@ -43,13 +47,17 @@ AISStream → Vercel server (private key, fixed monitoring area)
              GitHub Pages / Vercel dashboard
 ```
 
-The public relay is read-only. It shares an upstream subscription between visitors
-on the same warm instance, limits payloads and clients, and closes sessions before
-the function duration limit. The browser reconnects with backoff. An outage stays
-visible; the site never silently replaces live positions with sample vessels.
-The short-lived in-memory cache is not a vessel-history database or a global
-connection coordinator. This setup targets portfolio traffic; AISStream account
-connection limits still apply across separately scaled instances.
+The public endpoint is read-only. It collects a bounded seven-second window of
+AIS messages, closes the upstream socket before completing the HTTP response,
+and caches the snapshot for 30 seconds. Concurrent requests on the same warm
+instance share one collection; the CDN also caches successful responses.
+The browser shows the age of the AIS data and retries failures explicitly.
+It never silently replaces live positions with sample vessels.
+
+The first collection can take longer while AISStream opens its connection.
+The short-lived cache is not a vessel-history database or a global connection
+coordinator. This setup targets portfolio traffic; AISStream account connection
+limits still apply across separately scaled instances.
 
 ## Run locally
 
@@ -65,9 +73,9 @@ be entered in Settings on localhost; it is held in session storage and sent only
 to the local `/ais` proxy. The public website disables this key field and uses
 the server-owned relay instead.
 
-The public relay accepts the two deployed website origins. For local development
-of the relay, pass an explicit local origin to `createPublicServer`; never expose
-the local personal-key proxy as a public service.
+The snapshot contains intentionally public vessel data and permits cross-origin
+GET requests without credentials. Never expose the local personal-key proxy as
+a public service.
 
 ## Deploy the public relay
 
@@ -77,10 +85,10 @@ project, then deploy with `vercel --prod`. Never put the value in source, comman
 arguments, a `NEXT_PUBLIC_` variable, a browser bundle or GitHub Pages.
 
 - Frontend and relay: [vessel-eta-live.vercel.app](https://vessel-eta-live.vercel.app/)
-- Public status: [/api/live](https://vessel-eta-live.vercel.app/api/live) (configuration status, no secret)
+- Public snapshot: [/api/live](https://vessel-eta-live.vercel.app/api/live) (validated vessel fields, no secret)
 - GitHub Pages publishes only the explicit `site/` build artifact.
-- Vercel deploys the same frontend and the `api/live.mjs` Node function in Paris.
-- Both sites connect to `wss://vessel-eta-live.vercel.app/api/live`.
+- Vercel deploys the same frontend and the `api/live.mjs` Node function in Washington, D.C..
+- Both sites fetch `https://vessel-eta-live.vercel.app/api/live` every 30 seconds.
 
 After a key rotation, redeploy and run `node scripts/check-live.cjs`; this probes
 the public endpoint without reading the key. The previously exposed credential
@@ -95,8 +103,8 @@ node --test .github/scripts/deploy-pages.test.mjs
 npm audit
 ```
 
-Tests cover the relay subscription, sanitization, origin rejection, shared
-connection, read-only clients, provider errors and session expiry. Desktop and
+Tests cover the fixed subscription, sanitization, shared collection, cache expiry,
+read-only access, provider errors, empty feeds and upstream socket cleanup. Desktop and
 mobile browser tests cover simulation, live-mode separation, failure states,
 settings, filtering, exports and safe printing. CI runs these before Pages deploys.
 

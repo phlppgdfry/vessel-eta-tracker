@@ -83,33 +83,23 @@ test('settings control real map layers, validate thresholds and escape printable
 test('public live data stays separate from simulated planning and resets on mode switches', async ({page}) => {
   await page.route('**/api.open-meteo.com/**', route => route.abort());
   await page.route('**/tile.openstreetmap.org/**', route => route.abort());
-  await page.addInitScript(() => {
-    class Feed {
-      static OPEN = 1;
-      readyState = 0;
-      constructor(url) {
-        window.feedURLs = [...(window.feedURLs || []), url];
-        setTimeout(() => {
-          this.readyState = 1; this.onopen?.();
-          this.onmessage?.({data: JSON.stringify({MessageType:'PositionReport',
-            MetaData:{MMSI:477307900,ShipName:'REAL TEST VESSEL',latitude:51.5,longitude:2.9},
-            Message:{PositionReport:{Sog:12,Cog:125}}})});
-        }, 20);
-      }
-      send(value) { window.clientWrites = [...(window.clientWrites || []), value]; }
-      close() { this.readyState = 3; this.onclose?.(); }
-    }
-    window.WebSocket = Feed;
+  const requests=[];
+  await page.route('https://vessel-eta-live.vercel.app/api/live', async route => {
+    requests.push({method:route.request().method(),data:route.request().postData()});
+    await route.fulfill({json:{source:'AISStream',mode:'live',collectedAt:new Date().toISOString(),messages:[{
+      MessageType:'PositionReport',MetaData:{MMSI:477307900,ShipName:'REAL TEST VESSEL',latitude:51.5,longitude:2.9},
+      Message:{PositionReport:{Sog:12,Cog:125}},ReceivedAt:Date.now()
+    }]}});
   });
   await page.goto('/');
   const rows = page.locator('#vessel-list .vrow');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('REAL TEST VESSEL');
-  await expect(page.locator('#stext')).toHaveText('Live AIS · aisstream.io');
+  await expect(page.locator('#stext')).toHaveText('Live AIS · 30s snapshots');
   await expect(page.locator('#live-ct')).toHaveText('1 live');
   await expect(page.locator('#k-ontime')).toHaveText('—');
   await expect(page.locator('#k-crits')).toHaveText('—');
-  expect(await page.evaluate(()=>window.clientWrites || [])).toEqual([]);
+  expect(requests).toEqual([{method:'GET',data:null}]);
   expect(await page.evaluate(()=>Object.values(vessels).map(v=>({berth:v.berth,dev:v.dev,eta:v.schedEta}))))
     .toEqual([{berth:undefined,dev:undefined,eta:undefined}]);
   await rows.first().click();
@@ -133,17 +123,22 @@ test('public live data stays separate from simulated planning and resets on mode
 test('a failed live feed remains explicit and never inserts simulated vessels', async ({page}) => {
   await page.route('**/api.open-meteo.com/**', route => route.abort());
   await page.route('**/tile.openstreetmap.org/**', route => route.abort());
-  await page.addInitScript(() => {
-    window.WebSocket = class {
-      static OPEN = 1;
-      constructor() { setTimeout(()=>this.onerror?.(),20); }
-      close() {}
-    };
-  });
+  let phase='error';
+  await page.route('https://vessel-eta-live.vercel.app/api/live',route=>phase==='error'
+    ? route.fulfill({status:503,json:{error:'temporarily_unavailable'}})
+    : route.fulfill({json:{collectedAt:new Date(Date.now()-(phase==='stale'?120000:0)).toISOString(),messages:[{
+      MessageType:'PositionReport',MetaData:{MMSI:477307900,ShipName:'RECOVERED VESSEL',latitude:51.5,longitude:2.9},Message:{PositionReport:{Sog:12,Cog:125}},ReceivedAt:Date.now()
+    }]}}));
   await page.goto('/?mode=live');
-  await expect(page.locator('#stext')).toHaveText('Connection error');
+  await expect(page.locator('#stext')).toHaveText('AIS unavailable · retrying');
   await expect(page.locator('#vessel-list .vrow')).toHaveCount(0);
   expect(await page.evaluate(()=>demoMode)).toBe(false);
+  phase='stale'; await page.evaluate(()=>doReconnect());
+  await expect(page.locator('#stext')).toHaveText('AIS unavailable · retrying');
+  await expect(page.locator('#vessel-list .vrow')).toHaveCount(0);
+  phase='fresh'; await page.evaluate(()=>doReconnect());
+  await expect(page.locator('#stext')).toHaveText('Live AIS · 30s snapshots');
+  await expect(page.locator('#vessel-list .vrow')).toHaveCount(1);
   await page.locator('#demo-btn').click();
   await expect(page.locator('#vessel-list .vrow')).toHaveCount(8);
   await expect(page.locator('#stext')).toContainText('Simulated AIS');
