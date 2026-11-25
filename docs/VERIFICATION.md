@@ -92,20 +92,23 @@ The secret remains in the same Production project. Tests verify socket cleanup,
 shared collection, cache expiry and separation from simulated planning.
 
 
-## Latest external reception check — 25 November 2026
+## Latest external reception check — passed, 25 November 2026
 
-The snapshot endpoint returned HTTP 503 with `handshake_timeout`. An independent
-WebSocket opening attempt from the local computer also timed out without
-sending any key, and an HTTPS request to the official stream endpoint received
-no response within 15 seconds. This failure occurs before subscription or key
-validation. It is an external reachability limitation at the time of this check;
-it does not establish a service-wide outage or a rejected replacement key.
+The public snapshot endpoint returned HTTP 200 with 53 real messages from 53
+vessels, with a snapshot age of 16 seconds. Chromium subsequently displayed 60
+relevant live vessels. Automatic refresh was verified by observing the snapshot
+change from `2026-11-25T00:28:54.813Z` to `2026-11-25T00:29:48.009Z`, with the latest
+AIS age at zero seconds. Desktop and mobile live screenshots were refreshed.
 
-The new credential remains configured in Vercel Production. Earlier successful
-live reception and the 24 November live screenshots are historical evidence;
-continuous live availability is **not** claimed. The site reports unavailability
-and retries automatically, and its explicit simulation remains usable.
-The final snapshot implementation has been verified against a local test provider;
-real snapshot reception is still pending upstream reachability.
+Earlier checks returned `handshake_timeout`. An independent local WebSocket
+opening attempt without credentials and an HTTPS request to the stream address
+also timed out. These failures preceded authentication; a global provider outage
+was not established. Reception subsequently recovered. The current implementation
+shows outages, rejects snapshots older than 90 seconds and retries automatically.
+
+Nine Node checks and eight desktop/mobile browser checks passed, including
+shared collection, upstream cleanup, stale-data rejection, recovery and the
+explicit simulation button. No production terminal schedule is connected.
+Public coverage and continuous provider availability are not guaranteed.
 
 [Machine-readable current status](verification/live-ais-2026-11-25.json).

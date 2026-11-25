@@ -4,14 +4,14 @@
 
 **[Open live AIS](https://phlppgdfry.github.io/vessel-eta-tracker/)** · **[Open simulation](https://phlppgdfry.github.io/vessel-eta-tracker/?mode=demo)** · [Walkthrough](docs/PORTFOLIO.md) · [Verification](docs/VERIFICATION.md)
 
-Live AIS snapshots around Zeebrugge refresh every 30 seconds through a server-side relay.
-Visitors need no key. At the latest 25 November check, the upstream stream
-connection timed out before authentication; the UI reports that state and retries.
-See [current verification](docs/VERIFICATION.md) for the remaining external limitation. The optional simulation demonstrates arrival deviations,
+Live AIS snapshots around Zeebrugge arrive through a server-side relay; the
+dashboard polls every 30 seconds between responses and shows the data age.
+Visitors need no key. Public reception and automatic refresh were verified on
+25 November 2026. The optional simulation demonstrates arrival deviations,
 berth conflicts and handover planning with eight clearly labelled sample vessels.
 This is an independent portfolio project, not an endorsed CSP system.
 
-Live reception captured on 24 November 2026:
+Live snapshot reception captured on 25 November 2026:
 
 ![Actual live AIS dashboard](docs/screenshots/live-desktop.png)
 

@@ -133,6 +133,10 @@ test('a failed live feed remains explicit and never inserts simulated vessels', 
   await expect(page.locator('#stext')).toHaveText('AIS unavailable · retrying');
   await expect(page.locator('#vessel-list .vrow')).toHaveCount(0);
   expect(await page.evaluate(()=>demoMode)).toBe(false);
+  await page.getByRole('button',{name:'Open simulation',exact:true}).click();
+  await expect(page.locator('#vessel-list .vrow')).toHaveCount(8);
+  await page.locator('#live-btn').click();
+  await expect(page.locator('#stext')).toHaveText('AIS unavailable · retrying');
   phase='stale'; await page.evaluate(()=>doReconnect());
   await expect(page.locator('#stext')).toHaveText('AIS unavailable · retrying');
   await expect(page.locator('#vessel-list .vrow')).toHaveCount(0);
